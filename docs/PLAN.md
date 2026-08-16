@@ -4,64 +4,95 @@ Application Next.js qui crawle ~100 places de marché C2C (leboncoin, eBay, Klei
 extrait les annonces de RAM (DDR5/DDR4), détecte les prix **anormalement bas**, notifie en temps réel
 et affiche un dashboard du top des deals.
 
-> **Contrainte structurante : coût récurrent = 0 €.** Tout tourne sur le VPS déjà payé.
+> **Contrainte structurante : coût récurrent = 0 €.**
 > Aucune clé d'API payante, aucun proxy résidentiel, aucun SaaS facturé.
-> Chaque brique ci-dessous est soit open source self-hosted, soit un free tier permanent.
+> Chaque brique est soit open source self-hosted, soit un free tier permanent.
 
 ---
 
-## 1. Architecture générale
+## 1. Architecture générale — hybride VPS + PC maison
 
-Tout est en Docker Compose sur **ton VPS**, une seule commande, aucun service externe facturé.
+Deux machines déjà possédées, chacune sur ce qu'elle fait le mieux :
+
+| Machine | Rôle | Pourquoi elle |
+|---|---|---|
+| **VPS** (24/7, IP datacenter) | Postgres, Redis, Next.js, scheduler, notifications, crawl des sources faciles (T0/T1) | toujours allumé → le dashboard et les alertes ne tombent jamais |
+| **PC Windows** (RTX 4070, 32 Go) | Crawl furtif Camoufox, Firecrawl, Ollama sur GPU | **IP résidentielle FR** + 12 Go de VRAM + beaucoup de RAM |
+
+L'IP résidentielle du PC est l'atout majeur : c'est exactement ce qui manquait pour leboncoin
+et Facebook Marketplace. Une box Orange/Free vue par DataDome, c'est un vrai foyer français,
+pas un datacenter Hetzner.
 
 ```
-                         ┌─────────────────────────────────────────┐
-   navigateur ──────────►│  VPS (docker compose)                   │
-                         │                                         │
-                         │  ┌───────────────┐   ┌───────────────┐  │
-                         │  │ Next.js 15    │   │ worker        │  │
-                         │  │ (standalone)  │◄─►│ BullMQ        │  │
-                         │  │ dashboard+API │   │ scheduler     │  │
-                         │  └───────┬───────┘   └───┬───────┬───┘  │
-                         │          │               │       │      │
-                         │  ┌───────┴───────────────┴──┐    │      │
-                         │  │ Postgres 16   │ Redis 7  │    │      │
-                         │  └──────────────────────────┘    │      │
-                         │                                  ▼      │
-                         │            ┌──────────────────────────┐ │
-                         │            │ Firecrawl self-hosted    │ │
-                         │            │  └ playwright-service →  │ │
-                         │            │    Camoufox (Xvfb)       │ │
-                         │            └──────────────────────────┘ │
-                         │  ┌──────────────────────────┐           │
-                         │  │ Ollama (Qwen2.5-3B) opt. │           │
-                         │  └──────────────────────────┘           │
-                         └────────────────┬────────────────────────┘
-                                          ▼
-                                  Telegram Bot API (gratuit)
+                    ┌──────────────────────────────────────┐
+  navigateur ──────►│  VPS  (toujours allumé)              │
+                    │  ┌────────────┐  ┌────────────────┐  │
+                    │  │ Next.js 15 │  │ scheduler      │  │
+                    │  │ dashboard  │  │ + worker T0/T1 │  │
+                    │  └─────┬──────┘  └───┬────────────┘  │
+                    │  ┌─────┴─────────────┴─────┐         │
+                    │  │ Postgres 16 │ Redis 7   │         │
+                    │  └───────────────────┬─────┘         │
+                    └──────────────────────┼───────────────┘
+                                           │ WireGuard / Tailscale
+                                           │ (chiffré, gratuit)
+                    ┌──────────────────────┼───────────────┐
+                    │  PC Windows (WSL2)   ▼   IP RÉSIDENTIELLE
+                    │  ┌─────────────────────────────────┐ │
+                    │  │ worker T2/T3 (BullMQ consumer)  │ │
+                    │  ├─────────────────────────────────┤ │
+                    │  │ Firecrawl self-hosted           │ │
+                    │  │   └ playwright-service →        │ │
+                    │  │     Camoufox × 6-8              │ │
+                    │  ├─────────────────────────────────┤ │
+                    │  │ Ollama + Qwen2.5-14B  (CUDA)    │ │
+                    │  └─────────────────────────────────┘ │
+                    └──────────────────────────────────────┘
+                                    │
+                            Telegram Bot API
 ```
 
-**Décision clé : le crawling ne tourne PAS en serverless.** Un navigateur furtif (Camoufox) demande
-~400 Mo de RAM et 30-60 s par page ; les fonctions serverless (10 s / 1 Go) sont inadaptées.
-→ Le worker tourne sur le VPS. Le front ne déclenche jamais un crawl : il lit la base.
-Le worker crawle en continu selon un scheduler, le front poll `/api/deals` toutes les 60 s.
+**Le PC est un consommateur de queue, pas un serveur.** Il se connecte au Redis du VPS via le tunnel
+et pioche les jobs des files `crawl:t2` / `crawl:t3` / `parse:llm`. Conséquence directe :
+
+> **Si le PC est éteint, rien ne casse.** Le dashboard, la base, les alertes et les ~60 sources
+> T0/T1 continuent sur le VPS. Les jobs T2/T3 s'accumulent dans Redis et sont traités au prochain
+> allumage. C'est le point de design le plus important de cette archi : **dégradation gracieuse**,
+> jamais de panne.
+
+**Décision inchangée : le crawling ne tourne pas en serverless.** Camoufox demande ~400 Mo de RAM
+et 30-60 s par page. Le front ne déclenche jamais un crawl : il lit la base.
 
 ### Stack (tout gratuit)
 
 | Couche | Choix | Coût | Pourquoi |
 |---|---|---|---|
-| Front | Next.js 15 App Router (`output: standalone`), TS, Tailwind, shadcn/ui | 0 | RSC, une seule codebase ; déployé en Docker sur le VPS derrière Caddy |
-| DB | **Postgres 16 en conteneur** + Drizzle ORM | 0 | SQL relationnel + fenêtres glissantes pour les stats prix |
-| Queue | **BullMQ + Redis 7 en conteneur** | 0 | jobs répétables, retry/backoff, concurrence par domaine |
-| Crawl T1 | `undici` + `curl-impersonate` (ou `impit`) | 0 | TLS/JA3 d'un vrai navigateur, ~0 CPU |
-| Crawl T2 | **camoufox-js + Playwright** | 0 | open source (MPL), fingerprint patché en C++ |
-| Crawl T3 | **Firecrawl self-hosted** (déjà sur ton VPS) branché sur un `playwright-service` custom qui pilote Camoufox | 0 | orchestration, retry, extraction markdown, sans clé API |
-| Proxy/IP | rotation **IPv6 /64** du VPS + Cloudflare **WARP** gratuit + rate limiting poli | 0 | cf. §2 — remplace les proxies résidentiels payants |
-| Parsing specs | regex d'abord, **Ollama + Qwen2.5-3B-Instruct** local en fallback | 0 | ~1,9 Go de RAM, tourne sur CPU, largement suffisant pour extraire 6 champs d'un titre |
-| TLS / reverse proxy | **Caddy** (HTTPS auto Let's Encrypt) | 0 | une ligne de config |
-| Notif | **Telegram Bot API** | 0 | instantané, mobile, illimité en pratique |
-| Taux de change | API **frankfurter.app** (BCE, sans clé) | 0 | cache 24 h |
-| Monitoring | **Uptime Kuma** en conteneur (option) | 0 | ping des sources muettes |
+| Couche | Choix | Où | Pourquoi |
+|---|---|---|---|
+| Front | Next.js 15 App Router (`output: standalone`), TS, Tailwind, shadcn/ui | VPS | RSC, une seule codebase, derrière Caddy |
+| DB | **Postgres 16 en conteneur** + Drizzle ORM | VPS | SQL relationnel + fenêtres glissantes pour les stats prix |
+| Queue | **BullMQ + Redis 7** | VPS | files séparées par tier ; le PC est un consumer distant |
+| Lien VPS↔PC | **Tailscale** (gratuit jusqu'à 100 machines) ou WireGuard | — | zéro port à ouvrir sur ta box, chiffré, reconnexion auto |
+| Crawl T0/T1 | `undici` + `curl-impersonate` (ou `impit`) | VPS | TLS/JA3 d'un vrai navigateur, ~0 CPU |
+| Crawl T2 | **camoufox-js + Playwright** | **PC** | open source (MPL), fingerprint patché en C++, IP résidentielle |
+| Crawl T3 | **Firecrawl self-hosted** + `playwright-service` custom pilotant Camoufox | **PC** | orchestration sans clé API, depuis l'IP résidentielle |
+| Parsing specs | regex d'abord, **Ollama + Qwen2.5-14B-Instruct Q4_K_M** en fallback | **PC (GPU)** | ~9 Go de VRAM sur les 12 du 4070, ~40 tok/s → qualité proche d'une API payante |
+| TLS / reverse proxy | **Caddy** (HTTPS auto Let's Encrypt) | VPS | une ligne de config |
+| Notif | **Telegram Bot API** | VPS | instantané, mobile, illimité en pratique |
+| Taux de change | API **frankfurter.app** (BCE, sans clé) | VPS | cache 24 h |
+| Monitoring | **Uptime Kuma** en conteneur (option) | VPS | détection des sources muettes |
+
+### Le PC sous Windows, concrètement
+
+- **WSL2 + Docker Desktop** avec l'intégration WSL activée. Camoufox tourne en Linux dans WSL2
+  (bien plus stable que le portage Windows natif) ; le GPU est exposé à WSL2 via le driver NVIDIA,
+  donc Ollama y accède en CUDA sans configuration particulière.
+- **Empêcher la mise en veille** : `powercfg /change standby-timeout-ac 0`. L'écran peut s'éteindre,
+  pas la machine — sinon le worker se déconnecte de Redis.
+- **Démarrage auto** : Docker Desktop au login + `restart: unless-stopped` sur les conteneurs.
+- **Le PC reste utilisable normalement** : on plafonne à 4 navigateurs quand une session interactive
+  est détectée, 8 sinon. Le crawl est de l'attente réseau, pas du calcul — tu ne le sentiras pas
+  en jouant, sauf si Ollama tourne au même moment (d'où la file `parse:llm` limitée à 1 job).
 
 ---
 
@@ -126,37 +157,40 @@ Règles opérationnelles :
 - **Détection de blocage** : classifier la réponse (403/429, page < 2 Ko, présence de `captcha-delivery`,
   `cf-mitigated`, titre "Access Denied") → ne jamais parser silencieusement une page de blocage.
 
-### Stratégie IP sans proxies payants
+### Stratégie IP — l'IP résidentielle du PC change tout
 
-C'est le vrai renoncement du budget zéro : pas de proxies résidentiels. Quatre leviers gratuits,
-par ordre d'efficacité :
+Le problème n°1 du budget zéro était l'absence d'IP résidentielle. Ton PC la fournit gratuitement.
+Un fingerprint Camoufox propre **+** une IP de box française **=** exactement le profil qu'un
+antibot considère comme légitime. C'est ce que vendent les proxies résidentiels à 8 €/Go.
 
-1. **Le rate limiting est le meilleur proxy gratuit.** L'écrasante majorité des bans vient du volume,
-   pas du fingerprint. À 1 requête / 15 s sur un domaine, avec un fingerprint Camoufox propre et des
-   cookies persistants, une IP datacenter passe sur la plupart des sites. On vise 1 page de résultats
-   par source et par heure — soit ~24 requêtes/jour/site. C'est moins qu'un utilisateur humain motivé.
+**Routage des sources par IP :**
 
-2. **Rotation IPv6 `/64`.** Hetzner, OVH, Scaleway fournissent gratuitement un bloc `/64` par VPS,
-   soit 18 milliards d'adresses. On bind une IP source différente par session :
-   ```ts
-   // rotation gratuite, une IPv6 fraîche par requête
-   const agent = new Agent({ localAddress: randomIpv6FromPrefix(process.env.IPV6_PREFIX) })
-   ```
-   Limite honnête : ne marche que sur les sites joignables en IPv6 (~40 %), et certains bannissent
-   le `/64` entier plutôt que l'adresse. Utile, pas magique.
+| Sources | IP utilisée | Fréquence |
+|---|---|---|
+| ~60 sources T0/T1 (APIs, forums, OLX-likes) | VPS (datacenter) | 20-30 min |
+| ~35 sources T2 (Vinted, Wallapop, Kleinanzeigen…) | **PC résidentielle** | 30-60 min |
+| leboncoin, Facebook Marketplace | **PC résidentielle**, exclusivement | 45-60 min |
 
-3. **Cloudflare WARP** (gratuit, illimité) via `wgcf` → un egress IP différent de celui du VPS,
-   dans un pool consommateur. On peut lancer 2-3 conteneurs WARP avec des identités différentes
-   et router les sources sensibles à travers. Reconnexion = nouvelle IP.
+**Règles de préservation de l'IP résidentielle** — c'est ta seule, et un ban ferait mal
+(il toucherait aussi ta navigation perso sur ces sites) :
 
-4. **Fallback résidentiel gratuit** : un vieux Raspberry Pi (ou ton PC) chez toi en tunnel WireGuard
-   vers le VPS, utilisé **uniquement** pour les 2-3 sources les plus dures (leboncoin, FB).
-   C'est une vraie IP résidentielle FR, gratuite, et le volume y sera très faible.
-   → Si tu n'as pas de machine dispo à la maison, dis-le : ça change les attentes sur ces 2 sites.
+- **Plafond strict** : 1 req / 20-30 s sur les sites sensibles, jamais plus de 2 pages par run.
+- **Jamais de parallélisme** sur un même domaine sensible depuis l'IP maison.
+- **Circuit breaker** : au 1er signal de blocage (403, captcha, DataDome), arrêt immédiat de la source
+  pour 12 h. On ne s'acharne pas — c'est comme ça qu'on se fait blacklister durablement.
+- **Heures creuses évitées** : crawler à 4 h du matin est plus suspect qu'à 20 h. On calque le
+  scheduler sur des horaires plausibles (7 h-minuit) avec des trous aléatoires.
+- **Cookies persistants par site** dans un volume Docker → tu ressembles à un habitué qui revient,
+  pas à un visiteur neuf toutes les heures.
 
-Attente réaliste : avec ça, **~90 des 100 sources passent sans problème**. Leboncoin et Facebook
-Marketplace resteront capricieux sans levier 4 — on les crawlera en best-effort, avec cooldown long,
-et la page `/sources` dira honnêtement quand elles sont bloquées plutôt que de faire semblant.
+**Filet de sécurité si l'IP maison est bannie quand même :**
+rotation IPv6 `/64` du VPS (18 milliards d'adresses gratuites, mais ~40 % des sites seulement sont
+joignables en IPv6), Cloudflare WARP gratuit via `wgcf` pour un egress alternatif, et surtout
+le **redémarrage de la box** : sur la plupart des FAI français en IP dynamique, ça suffit à changer
+d'adresse. À garder comme dernier recours manuel, pas comme routine.
+
+**Attente réaliste : les 100 sources passent, leboncoin et Facebook inclus.** C'était le seul point
+d'interrogation du plan précédent ; il est levé.
 
 ### Ce qui reste réellement dur
 
@@ -236,13 +270,19 @@ ECC/RDIMM    /\b(ECC|RDIMM|LRDIMM)\b/ → serveur, marché différent
 marque       Corsair|G.Skill|Kingston|Crucial|TeamGroup|Patriot|ADATA|Kingston Fury...
 ```
 
-**Étape 2 — LLM local en fallback** pour les 10 % non parsés (titres du genre
-"vends barrettes gaming rgb pc neuf jamais servi") : **Ollama + Qwen2.5-3B-Instruct** sur le VPS,
-sortie contrainte en JSON (`format: json_schema`), cache par hash de titre normalisé.
-~1,9 Go de RAM, tourne en CPU, ~2 s par annonce — largement assez vu qu'on ne l'appelle que sur
-quelques dizaines d'annonces par heure. Coût : 0 €.
-Si la RAM du VPS est trop juste, on dégrade proprement : les annonces non parsées vont dans une file
-`needs_review` visible dans l'UI, sans bloquer le reste du pipeline.
+**Étape 2 — LLM local sur le GPU** pour les 10 % non parsés (titres du genre
+"vends barrettes gaming rgb pc neuf jamais servi") : **Ollama + Qwen2.5-14B-Instruct Q4_K_M**
+sur la RTX 4070, sortie contrainte par JSON Schema, cache par hash de titre normalisé.
+
+Le 4070 (12 Go de VRAM) fait tourner un 14B quantifié en Q4 (~9 Go) à ~40 tok/s. Comme la sortie
+fait ~80 tokens, c'est ~2 s par annonce, et on peut batcher. À cette taille, la qualité d'extraction
+est très proche d'une API payante — bien meilleure que le 3B CPU du plan précédent.
+
+Cette étape peut aussi servir à **traduire/normaliser** les annonces étrangères (polonais, tchèque,
+hongrois) que les regex ne couvrent pas, ce qui débloque une vingtaine de sources CEE.
+
+Si le PC est éteint, les annonces non parsées restent en `needs_review` et sont traitées au prochain
+allumage — le pipeline ne bloque jamais.
 
 **Étape 3 — garde-fous** (indispensables, c'est ce qui tue les faux positifs) :
 - exclure les **annonces de recherche** : `/\b(cherche|recherche|achète|wanted|suche|busco|WTB)\b/`
@@ -342,10 +382,20 @@ notify:dispatch     toutes les 2 min (batch les alertes, évite le spam)
 recheck:active      6× / jour sur les deals du top → marquer `sold`/`removed`
 ```
 
-Concurrence globale : bornée par la RAM du VPS (cf. §11), pilotée par une variable d'env
-`CRAWL_CONCURRENCY`. Même à 2 navigateurs en parallèle, 100 sources/heure passent : une source =
-1 à 3 pages, soit ~30 s de navigateur. 100 × 30 s = 50 min de temps navigateur cumulé, réparti sur
-2 workers = 25 min par heure. On a de la marge, et c'est ce qui rend le budget zéro viable.
+Files séparées par tier, consommées par des machines différentes :
+
+```
+crawl:t0, crawl:t1   → consumer VPS (24/7)
+crawl:t2, crawl:t3   → consumer PC   (quand allumé)
+parse:llm            → consumer PC   (concurrence 1, GPU)
+detect, notify, ref  → consumer VPS
+```
+
+Avec 8 navigateurs sur le PC, les ~35 sources T2/T3 sont traitées en ~5 min. Le facteur limitant
+n'est jamais le CPU mais le **rate limiting volontaire** : on veut rester lent. Si le PC a été
+éteint 12 h, on ne rejoue pas les 12 runs manqués — le scheduler **coalesce** les jobs en retard
+(un seul run par source au redémarrage), sinon on déclencherait une rafale qui ressemble
+exactement à un bot.
 
 ---
 
@@ -383,14 +433,14 @@ Anti-spam : dédup par listing, max 20 alertes/h, regroupement si > 3 deals en 2
 
 | Phase | Contenu | Sortie |
 |---|---|---|
-| **P0** | Monorepo (`apps/web`, `apps/worker`, `services/camoufox`, `packages/db`, `packages/core`), `docker-compose.yml` complet (Postgres, Redis, Firecrawl, Camoufox, Caddy), Drizzle + migrations | `docker compose up` fonctionne sur le VPS |
+| **P0** | Monorepo (`apps/web`, `apps/worker`, `services/camoufox`, `packages/db`, `packages/core`), **deux** compose (`compose.vps.yml`, `compose.home.yml`), Tailscale, Drizzle + migrations | `docker compose up` des deux côtés, PC qui consomme la queue du VPS |
 | **P1** | Framework de crawl : ladder T0→T3, registre de sources, 3 sources pilotes (eBay API, Kleinanzeigen T2, un OLX T1) | annonces réelles en base |
 | **P2** | Parsing specs (regex + LLM fallback) + garde-fous, backfill | `listing_specs` peuplée, précision mesurée sur 200 annonces annotées à la main |
 | **P3** | Prix de référence + détection d'anomalie + `deals` | top deals interrogeable en SQL |
 | **P4** | Front Next.js : dashboard, filtres, `/sources` | utilisable au quotidien |
 | **P5** | Telegram + watches | notifié en < 5 min |
 | **P6** | Montée à ~100 sources (adapter générique OLX-like en premier, ~30 d'un coup) | couverture large |
-| **P7** | Durcissement : rotation proxy, cooldowns, tests de non-régression des sélecteurs, alerte "source muette" | ça tourne sans surveillance |
+| **P7** | Durcissement : circuit breakers, coalescing, tests de non-régression des sélecteurs, alerte "source muette", Wake-on-LAN optionnel | ça tourne sans surveillance |
 
 Chaque phase est mergeable et utile seule. P1→P3 est le cœur de valeur ; P6 est du volume, pas du risque.
 
@@ -400,35 +450,34 @@ Chaque phase est mergeable et utile seule. P1→P3 est le cœur de valeur ; P6 e
 
 | Poste | Coût récurrent |
 |---|---|
-| VPS | **déjà payé** (aucun surcoût) |
-| Postgres 16 (conteneur) | 0 € |
-| Redis 7 (conteneur) | 0 € |
-| Firecrawl self-hosted | 0 € |
-| Camoufox | 0 € (open source) |
-| Ollama + Qwen2.5-3B | 0 € |
-| IPv6 /64 + Cloudflare WARP | 0 € |
+| VPS | **déjà payé** |
+| PC Windows | **déjà possédé** |
+| Postgres, Redis, Caddy, Firecrawl, Camoufox, Ollama, Uptime Kuma | 0 € (open source) |
+| Tailscale (≤ 100 machines) | 0 € |
 | Telegram Bot API | 0 € |
-| Caddy / Let's Encrypt | 0 € |
 | Taux de change (frankfurter.app) | 0 € |
-| **Total** | **0 €/mois** |
+| **Total logiciel + services** | **0 €/mois** |
 
-La vraie ressource contrainte n'est pas l'argent mais la **RAM du VPS** :
+**Le seul coût réel : l'électricité du PC.** À être transparent — ce n'est pas gratuit :
+un PC de ce type consomme ~60-90 W au repos avec du crawl léger (le GPU ne travaille que par
+à-coups pour Ollama). Soit ~50-65 kWh/mois, ≈ **10-16 €/mois** au tarif réglementé.
 
-| Service | RAM |
-|---|---|
-| Postgres | ~300 Mo |
-| Redis | ~100 Mo |
-| Next.js standalone | ~200 Mo |
-| Worker Node | ~250 Mo |
-| Firecrawl (api + worker) | ~500 Mo |
-| Camoufox × N instances | **~400 Mo chacune** |
-| Ollama (Qwen2.5-3B, chargé à la demande) | ~2 Go |
+Deux façons de le ramener à ~0 :
+- **Allumer le PC seulement quelques heures par jour** (le soir, quand tu l'utilises déjà). Grâce à
+  la dégradation gracieuse, le VPS continue les 60 sources faciles 24/7 et le PC rattrape la file
+  T2/T3 quand il démarre. Tu perds en réactivité sur leboncoin, pas en couverture.
+- **Wake-on-LAN piloté par le VPS** : le VPS réveille le PC toutes les 3 h, le worker traite sa file,
+  puis déclenche une mise en veille. ~30 min d'allumage par cycle → 2-3 €/mois. Plus élégant,
+  un peu plus de plomberie (P7).
 
-- **VPS 4 Go** → 2 instances Camoufox, Ollama désactivé (regex seule + file `needs_review`). Ça tourne.
-- **VPS 8 Go** → 4-6 instances Camoufox + Ollama. Confortable pour 100 sources/heure.
+### Budget RAM
 
-→ **Dis-moi la taille de ton VPS**, c'est le paramètre qui fixe la concurrence de crawl et le sort
-du parsing LLM. Le reste du plan ne bouge pas.
+**PC (32 Go)** — très confortable : 8 Camoufox (3,2 Go) + Firecrawl (0,5 Go) + Ollama (2 Go RAM,
+le modèle vit en VRAM) + WSL2 ≈ **7 Go**. Il te reste 25 Go pour ton usage normal.
+
+**VPS** — allégé par rapport au plan précédent, puisqu'il ne fait plus de navigateur :
+Postgres 300 Mo + Redis 100 Mo + Next.js 200 Mo + worker T0/T1 250 Mo ≈ **1 Go**.
+→ **Un VPS 2 Go suffit largement.** Même le plus petit que tu aies fera l'affaire.
 
 ---
 
@@ -439,21 +488,25 @@ du parsing LLM. Le reste du plan ne bouge pas.
 | Un site change son HTML → 0 annonce silencieusement | Canary : alerte si une source retourne 0 résultat 2 runs de suite alors qu'elle en retournait > 10 |
 | Faux positifs (annonce de recherche, HS, arnaque) | Garde-fous §4 + seuil de confiance + badge scam |
 | Référence prix instable au démarrage (peu de données) | Pas d'alerte tant que n < 30 par bucket ; bootstrap possible avec les prix neufs (Amazon/Newegg) comme borne haute |
-| Blocage de l'IP du VPS (pas de proxy payant) | Rate limiting agressif (§2), rotation IPv6 /64, WARP, cooldown par source. Sur les 2-3 sites les plus durs : tunnel WireGuard vers une IP résidentielle perso |
-| RAM du VPS insuffisante | `CRAWL_CONCURRENCY` configurable, Ollama optionnel, `block_images` activé, profils navigateur recyclés toutes les N pages |
+| **Ban de l'IP résidentielle** (impacterait ta navigation perso) | Le risque le plus sérieux du plan. Circuit breaker au 1er signal, 1 req/20-30 s, jamais de parallélisme par domaine, horaires plausibles. Recours : WARP, IPv6 du VPS, redémarrage box |
+| PC éteint / en veille | Dégradation gracieuse par design : le VPS assure 24/7, les jobs T2/T3 s'empilent et sont coalescés au réveil. Option Wake-on-LAN (P7) |
+| IP dynamique de la box qui change | Tailscale gère la reconnexion tout seul (c'est le PC qui initie le tunnel, pas l'inverse) |
+| Rafale de requêtes au redémarrage du PC | Coalescing des jobs en retard (§7) — un seul run par source, pas 12 |
 | Le deal est parti avant que tu voies l'alerte | Fréquence ↑ sur les 10 sources les plus rentables, Telegram en priorité, `recheck:active` pour marquer les vendus |
 
 ---
 
 ## 13. Décisions à valider
 
-1. **Taille du VPS** (RAM / vCPU) — fixe `CRAWL_CONCURRENCY` et si Ollama est activé (cf. §11).
-2. **Une IP résidentielle dispo chez toi ?** (Raspberry Pi / PC allumé en WireGuard) — conditionne
-   la faisabilité réelle de leboncoin et Facebook Marketplace.
-3. **Périmètre géographique** : FR seul, FR+DE+BENELUX, ou Europe entière ? (acheter en Pologne
+1. **Le PC tourne-t-il 24/7, ou seulement quand tu l'utilises ?** Seul paramètre qui change la
+   réactivité sur leboncoin (cf. §11 : ~13 €/mois d'électricité en 24/7, ~0 en usage ponctuel).
+   Par défaut je pars sur **usage ponctuel + dégradation gracieuse**, c'est le meilleur ratio.
+2. **Périmètre géographique** : FR seul, FR+DE+BENELUX, ou Europe entière ? (acheter en Pologne
    implique du port et du risque ; mais plus de sources = plus de deals)
-4. **DDR5 seule ou DDR4 aussi ?** (DDR4 a aussi explosé, marché plus large)
-5. **Mono-utilisateur ou multi-utilisateur** (auth) ? Mono simplifie beaucoup la P5.
+3. **DDR5 seule ou DDR4 aussi ?** (DDR4 a aussi explosé, marché plus large)
+4. **Mono-utilisateur ou multi-utilisateur** (auth) ? Mono simplifie beaucoup la P5.
+5. **Dashboard exposé publiquement** (nom de domaine + Caddy) ou accessible **uniquement via
+   Tailscale** ? La 2ᵉ option est plus simple et plus sûre : aucun port ouvert, pas d'auth à écrire.
 
 ---
 
@@ -461,14 +514,16 @@ du parsing LLM. Le reste du plan ne bouge pas.
 
 Pour être clair sur les compromis, plutôt que de prétendre que c'est identique au setup payant :
 
-| Aspect | Payant | Gratuit (ce plan) | Impact réel |
+| Aspect | Setup payant | Ce plan (0 €) | Impact réel |
 |---|---|---|---|
-| Furtivité de base | Camoufox | Camoufox | **aucun** — c'est gratuit des deux côtés |
+| Furtivité | Camoufox | Camoufox | **aucun** — gratuit des deux côtés |
 | Orchestration | Firecrawl cloud | Firecrawl self-hosted | **aucun** |
-| Résolution auto DataDome | incluse (`proxy: stealth`) | à faire soi-même via Camoufox + IP propre | leboncoin/FB en best-effort |
-| Diversité d'IP | résidentiels illimités | IPv6 + WARP + 1 IP perso | fréquence de crawl réduite sur les sites durs |
-| Parsing LLM | Haiku (rapide, très fiable) | Qwen2.5-3B local (plus lent, un peu moins fiable) | ~2-3 % de specs mal parsées en plus → mitigé par la file `needs_review` |
-| Ops | zéro | `docker compose` à maintenir | quelques heures de setup |
+| IP résidentielle | proxies à ~8 €/Go | **ta box** | **aucun sur la qualité** ; en échange, volume à ménager (une seule IP à préserver) |
+| Résolution DataDome | `proxy: stealth` inclus | Camoufox + IP résidentielle | **aucun** — c'est la même recette |
+| Parsing LLM | Haiku 4.5 | Qwen2.5-14B sur RTX 4070 | quasi équivalent sur une tâche d'extraction aussi cadrée |
+| Disponibilité | 100 % | VPS 100 %, PC intermittent | latence plus élevée sur ~35 sources quand le PC dort |
+| Ops | zéro | 2 × `docker compose` | quelques heures de setup |
 
-Rien de bloquant. Le seul vrai renoncement est la fréquence de crawl sur leboncoin et Facebook —
-et il disparaît si tu as une machine à la maison pour le tunnel WireGuard.
+**Il ne reste aucun renoncement fonctionnel.** Le seul arbitrage est disponibilité vs électricité,
+et il est entre tes mains (§13.1). Ajouter ton PC à l'équation a supprimé le dernier point faible
+du plan gratuit.
