@@ -1,0 +1,1129 @@
+<title>RAM Deal Hunter</title>
+<style>
+  :root {
+    --ground: #EFF1F4;
+    --surface: #FFFFFF;
+    --surface-2: #F6F7F9;
+    --ink: #14181F;
+    --ink-2: #3C4553;
+    --muted: #6B7686;
+    --line: #D9DEE6;
+    --line-soft: #E8ECF1;
+    --brass: #8A6412;
+    --brass-bright: #B08420;
+    --teal: #14615C;
+    --clay: #97331F;
+    --shadow: 0 1px 2px rgba(20,24,31,.06), 0 8px 24px -12px rgba(20,24,31,.18);
+
+    --display: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --body: Georgia, "Iowan Old Style", "Times New Roman", serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101318;
+      --surface: #171B22;
+      --surface-2: #1D222A;
+      --ink: #E7EAEE;
+      --ink-2: #C0C7D1;
+      --muted: #8E99A8;
+      --line: #2A313B;
+      --line-soft: #232A33;
+      --brass: #D6A63F;
+      --brass-bright: #E5BC5E;
+      --teal: #4FB3A5;
+      --clay: #D9765F;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #101318;
+    --surface: #171B22;
+    --surface-2: #1D222A;
+    --ink: #E7EAEE;
+    --ink-2: #C0C7D1;
+    --muted: #8E99A8;
+    --line: #2A313B;
+    --line-soft: #232A33;
+    --brass: #D6A63F;
+    --brass-bright: #E5BC5E;
+    --teal: #4FB3A5;
+    --clay: #D9765F;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16.5px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 24px 96px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0 56px;
+  }
+  @media (min-width: 1060px) {
+    .wrap { grid-template-columns: 190px minmax(0, 1fr); }
+    .masthead { grid-column: 1 / -1; }
+  }
+
+  /* ---- masthead ---- */
+  .masthead {
+    padding: 72px 0 40px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 48px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--brass);
+    margin: 0 0 20px;
+  }
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(38px, 6.2vw, 66px);
+    line-height: 1.02;
+    letter-spacing: -.035em;
+    font-weight: 700;
+    margin: 0 0 22px;
+    text-wrap: balance;
+  }
+  .standfirst {
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 60ch;
+    margin: 0 0 36px;
+  }
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .fact {
+    flex: 1 1 150px;
+    padding: 16px 20px;
+    border-right: 1px solid var(--line-soft);
+  }
+  .fact:last-child { border-right: 0; }
+  .fact dt {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+  .fact dd {
+    font-family: var(--display);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -.02em;
+    margin: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- nav rail ---- */
+  nav.rail { display: none; }
+  @media (min-width: 1060px) {
+    nav.rail {
+      display: block;
+      position: sticky;
+      top: 32px;
+      align-self: start;
+      max-height: calc(100vh - 64px);
+      overflow-y: auto;
+      padding-bottom: 24px;
+    }
+    nav.rail ol {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      counter-reset: nav;
+    }
+    nav.rail a {
+      display: flex;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 11.5px;
+      line-height: 1.4;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 5px 0;
+      border-bottom: 1px solid transparent;
+    }
+    nav.rail a:hover { color: var(--brass); }
+    nav.rail a:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+    nav.rail .n { color: var(--line); flex: 0 0 auto; }
+    nav.rail a:hover .n { color: var(--brass); }
+  }
+
+  /* ---- sections ---- */
+  section { margin-bottom: 64px; scroll-margin-top: 24px; }
+  h2 {
+    font-family: var(--display);
+    font-size: 27px;
+    letter-spacing: -.025em;
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 0 0 6px;
+    text-wrap: balance;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 400;
+    letter-spacing: 0;
+    color: var(--brass);
+    flex: 0 0 auto;
+  }
+  .deck {
+    color: var(--muted);
+    font-size: 15.5px;
+    margin: 0 0 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--line-soft);
+    max-width: 68ch;
+  }
+  h3 {
+    font-family: var(--display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -.005em;
+    margin: 36px 0 12px;
+  }
+  p { max-width: 68ch; margin: 0 0 16px; }
+  ul, ol { max-width: 68ch; padding-left: 20px; margin: 0 0 16px; }
+  li { margin-bottom: 8px; }
+  strong { font-weight: 700; color: var(--ink); }
+  code {
+    font-family: var(--mono);
+    font-size: .86em;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  a { color: var(--brass); }
+
+  /* ---- callouts ---- */
+  .note {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--brass);
+    border-radius: 0 3px 3px 0;
+    padding: 18px 22px;
+    margin: 0 0 20px;
+    max-width: 68ch;
+    box-shadow: var(--shadow);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note.warn { border-left-color: var(--clay); }
+  .note.good { border-left-color: var(--teal); }
+  .note-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  /* ---- tables ---- */
+  .scroll { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--line); border-radius: 3px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; font-family: var(--display); }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  thead th {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+    background: var(--surface-2);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.n { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; width: 1%; }
+  td.site { font-weight: 700; white-space: nowrap; }
+  td.note-col { color: var(--ink-2); font-size: 13.5px; min-width: 240px; }
+  .num-cell { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ---- chips ---- */
+  .chip {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .06em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid;
+    white-space: nowrap;
+    display: inline-block;
+  }
+  .t0 { color: var(--teal); border-color: var(--teal); }
+  .t1 { color: var(--teal); border-color: var(--line); }
+  .t2 { color: var(--brass); border-color: var(--brass); }
+  .t3 { color: var(--clay); border-color: var(--clay); }
+  .p1 { color: var(--ink); border-color: var(--ink); font-weight: 700; }
+  .p2 { color: var(--muted); border-color: var(--line); }
+  .p3 { color: var(--muted); border-color: var(--line-soft); }
+  .star { color: var(--brass); font-size: 12px; }
+
+  /* ---- diagram ---- */
+  pre.diagram {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.5;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 0 0 24px;
+    color: var(--ink-2);
+  }
+  pre.code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 0 0 24px;
+  }
+  pre.code .c { color: var(--muted); }
+
+  /* ---- stage cards ---- */
+  .stages { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+  .stage {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 20px 24px;
+    box-shadow: var(--shadow);
+  }
+  .stage.primary { border-color: var(--brass); border-width: 1.5px; }
+  .stage h3 { margin-top: 0; font-size: 17px; }
+  .stage .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--brass);
+    display: block;
+    margin-bottom: 8px;
+  }
+  .stage table { font-size: 13.5px; }
+  .stage .scroll { border: 0; box-shadow: none; margin-bottom: 0; background: none; }
+
+  footer {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--muted);
+    letter-spacing: .04em;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Plan technique — application Next.js</p>
+    <h1>RAM Deal Hunter</h1>
+    <p class="standfirst">
+      Crawler ~100 places de marché entre particuliers pour détecter les barrettes DDR5
+      et DDR4 vendues à un prix anormalement bas, et être notifié sur Telegram avant que
+      l'annonce ne parte. Tout tourne en local, sans un euro de coût récurrent.
+    </p>
+    <dl class="facts">
+      <div class="fact"><dt>Coût récurrent</dt><dd>0 €/mois</dd></div>
+      <div class="fact"><dt>Sources visées</dt><dd>~100</dd></div>
+      <div class="fact"><dt>Adapters à écrire</dt><dd>~25</dd></div>
+      <div class="fact"><dt>Machines</dt><dd>1</dd></div>
+      <div class="fact"><dt>Clés d'API payantes</dt><dd>0</dd></div>
+    </dl>
+  </header>
+
+  <nav class="rail" aria-label="Sommaire">
+    <ol>
+      <li><a href="#archi"><span class="n">01</span><span>Architecture</span></a></li>
+      <li><a href="#antibot"><span class="n">02</span><span>Anti-bot</span></a></li>
+      <li><a href="#sources"><span class="n">03</span><span>Les 100 sources</span></a></li>
+      <li><a href="#specs"><span class="n">04</span><span>Extraction specs</span></a></li>
+      <li><a href="#anomalie"><span class="n">05</span><span>Détection prix</span></a></li>
+      <li><a href="#schema"><span class="n">06</span><span>Schéma DB</span></a></li>
+      <li><a href="#ordo"><span class="n">07</span><span>Ordonnancement</span></a></li>
+      <li><a href="#front"><span class="n">08</span><span>Frontend</span></a></li>
+      <li><a href="#notif"><span class="n">09</span><span>Notifications</span></a></li>
+      <li><a href="#phasage"><span class="n">10</span><span>Phasage</span></a></li>
+      <li><a href="#couts"><span class="n">11</span><span>Coûts</span></a></li>
+      <li><a href="#risques"><span class="n">12</span><span>Risques</span></a></li>
+      <li><a href="#defauts"><span class="n">13</span><span>Défauts retenus</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- 01 -->
+    <section id="archi">
+      <h2><span class="num">01</span>Architecture — 100 % local</h2>
+      <p class="deck">Une seule machine, un seul <code>docker compose up</code>. Le PC apporte trois
+        choses qu'aucun hébergeur gratuit ne donne : une IP résidentielle française, un GPU, et
+        32 Go de RAM.</p>
+
+      <pre class="diagram">┌────────────────────────────────────────────────────────────┐
+│  PC Windows — WSL2 + Docker Desktop                        │
+│                                                            │
+│   ┌──────────────┐         ┌──────────────────────────┐    │
+│   │ Next.js 15   │◄───────►│ worker (BullMQ)          │    │
+│   │ dashboard    │         │ scheduler + crawl + deals│    │
+│   │ :3000        │         └────┬──────────────┬──────┘    │
+│   └──────┬───────┘              │              │           │
+│          │      ┌───────────────┴──┐           │           │
+│          └──────┤ Postgres │ Redis │           │           │
+│                 └──────────────────┘           ▼           │
+│                              ┌─────────────────────────┐   │
+│                              │ Firecrawl self-hosted   │   │
+│                              │  └ playwright-service → │   │
+│                              │    Camoufox × 8 (Xvfb)  │   │
+│                              └─────────────────────────┘   │
+│        ┌──────────────────────────────────────────────┐    │
+│        │ LM Studio (mode serveur, hors Docker)        │    │
+│        │  API OpenAI-compatible → localhost:1234/v1   │    │
+│        │  Gemma 12B QAT (+ petit modèle traduction)   │    │
+│        └──────────────────────────────────────────────┘    │
+└────────────────────────┬─────────────────────┬─────────────┘
+                         │                     │
+                 IP RÉSIDENTIELLE FR    Telegram Bot API
+                  (vers les 100 sites)   (alertes sur mobile)</pre>
+
+      <p><strong>Ce que le tout-local supprime :</strong> tunnel, second compose, reverse proxy,
+        HTTPS, authentification, secrets à synchroniser. Le projet perd un tiers de sa plomberie.</p>
+      <p><strong>Ce qu'il coûte :</strong> quand le PC est éteint, tout est arrêté. C'est le mode
+        d'usage prévu — lancer une journée de temps en temps — et le seul vrai compromis.</p>
+
+      <h3>Stack</h3>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Couche</th><th>Choix</th><th>Pourquoi</th></tr></thead>
+          <tbody>
+            <tr><td class="site">Front</td><td>Next.js 15 App Router, TS, Tailwind, shadcn/ui</td><td class="note-col">Sert sur <code>localhost:3000</code></td></tr>
+            <tr><td class="site">DB</td><td>Postgres 16 + Drizzle</td><td class="note-col">Fenêtres glissantes pour les stats prix</td></tr>
+            <tr><td class="site">Queue</td><td>BullMQ + Redis 7</td><td class="note-col">Jobs répétables, rate limit par domaine</td></tr>
+            <tr><td class="site">Crawl T0/T1</td><td><code>undici</code> + <code>curl-impersonate</code></td><td class="note-col">TLS/JA3 d'un vrai navigateur</td></tr>
+            <tr><td class="site">Crawl T2</td><td>camoufox-js + Playwright</td><td class="note-col">Fingerprint patché en C++</td></tr>
+            <tr><td class="site">Crawl T3</td><td>Firecrawl self-hosted + service Camoufox</td><td class="note-col">Orchestration sans clé API</td></tr>
+            <tr><td class="site">LLM</td><td>LM Studio en mode serveur</td><td class="note-col">API OpenAI-compatible, modèles gérés en GUI</td></tr>
+            <tr><td class="site">Notif</td><td>Telegram Bot API</td><td class="note-col">Sortant uniquement, arrive sur le mobile</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note-label">Note WSL2</span>
+        <p>LM Studio reste côté Windows, hors Docker — la GUI pour charger les modèles, le GPU sans
+          intermédiaire. Depuis un conteneur, on l'atteint via
+          <code>http://host.docker.internal:1234/v1</code>.</p>
+      </div>
+    </section>
+
+    <!-- 02 -->
+    <section id="antibot">
+      <h2><span class="num">02</span>Stratégie anti-bot</h2>
+      <p class="deck">Un ladder à quatre niveaux. Chaque source déclare son tier minimum ; on ne monte
+        que si ça échoue, et on mémorise ce qui a marché.</p>
+
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Tier</th><th>Technique</th><th>Cible</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="chip t0">T0</span></td>
+              <td><strong>API officielle / flux.</strong> eBay Browse API (5 000 appels/j gratuits), API Reddit, RSS, sitemaps, endpoints JSON de l'app mobile</td>
+              <td class="note-col">eBay, Reddit, sites ouverts</td>
+            </tr>
+            <tr>
+              <td><span class="chip t1">T1</span></td>
+              <td><strong>HTTP impersonate.</strong> TLS + JA3/JA4 + ordre des frames HTTP/2 d'un vrai navigateur, headers cohérents, cookies persistés</td>
+              <td class="note-col">~55 % des sites : annonces régionales, forums, OLX-likes</td>
+            </tr>
+            <tr>
+              <td><span class="chip t2">T2</span></td>
+              <td><strong>Camoufox.</strong> Firefox patché en C++ : canvas, WebGL, fonts, screen, timezone injectés <em>sous</em> le runtime JS → indétectable par <code>navigator.webdriver</code> ou les fuites CDP</td>
+              <td class="note-col">~35 % : Vinted, Wallapop, Subito, Kleinanzeigen, Marktplaats</td>
+            </tr>
+            <tr>
+              <td><span class="chip t3">T3</span></td>
+              <td><strong>Firecrawl self-hosted</strong> dont le <code>playwright-service</code> est remplacé par un microservice Camoufox maison</td>
+              <td class="note-col">leboncoin, Facebook Marketplace</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note warn">
+        <span class="note-label">Point d'attention</span>
+        <p>Le mode <code>proxy: "stealth"</code> de Firecrawl — celui qui casse DataDome tout seul —
+          est une fonctionnalité du <strong>cloud payant</strong>, absente du self-hosted. Le
+          self-hosted donne l'orchestration, pas la furtivité. C'est donc <strong>Camoufox qui
+          fournit la furtivité</strong> et Firecrawl qui l'orchestre : le seul montage qui donne
+          les deux gratuitement.</p>
+      </div>
+
+      <h3>Une seule IP, résidentielle, à préserver</h3>
+      <p>Un fingerprint Camoufox propre <strong>plus</strong> une IP de box française : c'est
+        exactement ce que vendent les proxies résidentiels à 8 €/Go. Mais c'est aussi l'IP de la
+        navigation personnelle — un ban gênerait l'utilisateur, pas juste le bot. Toute la discipline
+        du crawl en découle.</p>
+      <ul>
+        <li><strong>1 req / 15 s</strong> sur les sites normaux, <strong>1 req / 25-30 s</strong> sur
+          les sensibles ; jamais plus de 2-3 pages par run.</li>
+        <li><strong>Jamais de parallélisme sur un même domaine.</strong> Les 8 navigateurs travaillent
+          sur 8 sites différents.</li>
+        <li><strong>Circuit breaker :</strong> au premier 403, 429 ou captcha, arrêt de la source pour
+          12 h. C'est l'acharnement qui transforme un blocage temporaire en blacklist durable.</li>
+        <li><strong>Horaires plausibles :</strong> 7 h – minuit, avec des trous aléatoires. Un foyer
+          qui consulte leboncoin à 4 h du matin chaque nuit, c'est un signal.</li>
+        <li><strong>Cookies persistants par site</strong> → un habitué qui revient, pas un visiteur
+          neuf toutes les heures.</li>
+      </ul>
+      <p>Budget global : ~200 requêtes/heure réparties sur 100 domaines. Par domaine, c'est 2 pages
+        par heure — moins qu'un humain qui chine sérieusement. Recours en cas de ban : redémarrage de
+        la box (IP dynamique chez la plupart des FAI), ou Cloudflare WARP.</p>
+
+      <h3>Ce qui reste réellement dur</h3>
+      <p>Facebook Marketplace (login + détection comportementale) et leboncoin (DataDome). Pour
+        leboncoin, <strong>l'API JSON de l'app mobile est à tester en premier</strong> : elle est
+        nettement plus permissive que le web, et si elle passe, tout le problème DataDome disparaît.</p>
+
+      <div class="note">
+        <span class="note-label">Cadre</span>
+        <p>Robots.txt et CGU varient ; certains sites interdisent le scraping. Les annonces contiennent
+          des données personnelles → on ne stocke que ce qui sert au deal (titre, prix, specs, URL,
+          image, ville), jamais les coordonnées du vendeur. Rétention 90 jours. Le registre de sources
+          rend l'ajout ou le retrait d'un site trivial.</p>
+      </div>
+    </section>
+
+    <!-- 03 -->
+    <section id="sources">
+      <h2><span class="num">03</span>Les 100 sources</h2>
+      <p class="deck">Une source = un fichier de config déclaratif, parfois un adapter custom.
+        <span class="chip t0">T</span> = tier de crawl · <span class="chip p2">P</span> = priorité
+        (1 = tout de suite, 3 = volume) · <span class="star">★</span> = fort rendement attendu.</p>
+
+      <h3>🇫🇷 France — priorité absolue, retrait en main propre possible</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">1</td><td class="site">leboncoin.fr <span class="star">★</span></td><td><span class="chip t3">T3</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Le gisement n°1. DataDome → IP résidentielle obligatoire. Tester l'API mobile d'abord</td></tr>
+          <tr><td class="n">2</td><td class="site">eBay.fr <span class="star">★</span></td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">API Browse officielle, gratuite. Zéro risque, à faire en premier</td></tr>
+          <tr><td class="n">3</td><td class="site">Vinted.fr</td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Il y a de l'informatique, et les vendeurs y connaissent mal les prix</td></tr>
+          <tr><td class="n">4</td><td class="site">Facebook Marketplace <span class="star">★</span></td><td><span class="chip t3">T3</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Gros volume, mais login requis. Le plus dur du lot</td></tr>
+          <tr><td class="n">5</td><td class="site">Rakuten.fr</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Ex-PriceMinister</td></tr>
+          <tr><td class="n">6</td><td class="site">Geektroc <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Troc hardware entre passionnés, petit mais très dense en RAM</td></tr>
+          <tr><td class="n">7</td><td class="site">HardwareFr — troc</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Historique, encore actif</td></tr>
+          <tr><td class="n">8</td><td class="site">Cowcotland — PA</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Communauté hardware FR</td></tr>
+          <tr><td class="n">9</td><td class="site">CanardPC — troc</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Bonne qualité d'annonces</td></tr>
+          <tr><td class="n">10</td><td class="site">Overclocking.com</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Niche</td></tr>
+          <tr><td class="n">11</td><td class="site">JeuxVideo.com — troc</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Bruyant, mais gratuit à crawler</td></tr>
+          <tr><td class="n">12</td><td class="site">Cdiscount Marketplace</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Vendeurs tiers, occasion</td></tr>
+          <tr><td class="n">13</td><td class="site">Rueducommerce</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Marketplace</td></tr>
+          <tr><td class="n">14</td><td class="site">Label Emmaüs</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Rare, mais prix cassés par méconnaissance</td></tr>
+          <tr><td class="n">15</td><td class="site">Troc.com</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Dépôt-vente</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇩🇪🇦🇹🇨🇭 Germanophone — le meilleur rapport volume/facilité d'Europe</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">16</td><td class="site">Kleinanzeigen.de <span class="star">★</span></td><td><span class="chip t2">T2</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Le plus gros gisement européen, HTML stable, T2 suffit</td></tr>
+          <tr><td class="n">17</td><td class="site">eBay.de <span class="star">★</span></td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Même API, un paramètre de marketplace à changer</td></tr>
+          <tr><td class="n">18</td><td class="site">Hardwareluxx <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Forum d'enthousiastes, RAM haut de gamme fréquente</td></tr>
+          <tr><td class="n">19</td><td class="site">ComputerBase</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Marktplatz, très sérieux</td></tr>
+          <tr><td class="n">20</td><td class="site">Willhaben.at</td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Leader autrichien</td></tr>
+          <tr><td class="n">21</td><td class="site">Ricardo.ch</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Prix souvent élevés mais volume</td></tr>
+          <tr><td class="n">22</td><td class="site">Tutti.ch</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Suisse</td></tr>
+          <tr><td class="n">23</td><td class="site">Anibis.ch</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Suisse</td></tr>
+          <tr><td class="n">24</td><td class="site">eBay.at</td><td><span class="chip t0">T0</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Via API</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇧🇪🇳🇱 Benelux — livraison rapide vers la France</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">25</td><td class="site">Marktplaats.nl <span class="star">★</span></td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Le leboncoin néerlandais, très gros volume</td></tr>
+          <tr><td class="n">26</td><td class="site">Tweakers — V&amp;A <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Pépite : communauté hardware NL, annonces techniques précises, crawl facile</td></tr>
+          <tr><td class="n">27</td><td class="site">2dehands.be</td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Même moteur que Marktplaats</td></tr>
+          <tr><td class="n">28</td><td class="site">2ememain.be</td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Version francophone</td></tr>
+          <tr><td class="n">29</td><td class="site">eBay.nl</td><td><span class="chip t0">T0</span></td><td><span class="chip p3">P3</span></td><td class="note-col">API</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇬🇧🇮🇪 Îles britanniques</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">30</td><td class="site">eBay.co.uk <span class="star">★</span></td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">API. TVA/douane post-Brexit à pondérer dans le score</td></tr>
+          <tr><td class="n">31</td><td class="site">Overclockers UK <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Member Market, excellentes annonces</td></tr>
+          <tr><td class="n">32</td><td class="site">Gumtree.com</td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Généraliste UK</td></tr>
+          <tr><td class="n">33</td><td class="site">Adverts.ie</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Irlande — zone euro, pas de douane</td></tr>
+          <tr><td class="n">34</td><td class="site">Preloved.co.uk</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Petit</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇪🇸🇮🇹🇵🇹 Europe du Sud</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">35</td><td class="site">Wallapop.es <span class="star">★</span></td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Très gros volume, API interne exploitable</td></tr>
+          <tr><td class="n">36</td><td class="site">Milanuncios.es</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Généraliste</td></tr>
+          <tr><td class="n">37</td><td class="site">Subito.it <span class="star">★</span></td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Leader italien</td></tr>
+          <tr><td class="n">38</td><td class="site">eBay.it</td><td><span class="chip t0">T0</span></td><td><span class="chip p3">P3</span></td><td class="note-col">API</td></tr>
+          <tr><td class="n">39</td><td class="site">OLX.pt</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Portugal</td></tr>
+          <tr><td class="n">40</td><td class="site">CustoJusto.pt</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Portugal</td></tr>
+          <tr><td class="n">41</td><td class="site">Segundamano / Vibbo</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Espagne</td></tr>
+          <tr><td class="n">42</td><td class="site">Tom's Hardware IT</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Forum mercatino</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇸🇪🇳🇴🇩🇰🇫🇮 Nordiques — souvent sous-cotés, anglais courant</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">43</td><td class="site">Blocket.se <span class="star">★</span></td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Leader suédois</td></tr>
+          <tr><td class="n">44</td><td class="site">Finn.no</td><td><span class="chip t2">T2</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Norvège — hors UE, douane à pondérer</td></tr>
+          <tr><td class="n">45</td><td class="site">DBA.dk</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Danemark</td></tr>
+          <tr><td class="n">46</td><td class="site">Tori.fi</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Finlande</td></tr>
+          <tr><td class="n">47</td><td class="site">Sweclockers <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Marknad — forum hardware suédois très actif</td></tr>
+          <tr><td class="n">48</td><td class="site">Bytbil / Kvdbil</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Marginal</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇵🇱🇨🇿🇸🇰🇭🇺🇷🇴 Europe centrale — les prix les plus bas d'Europe</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">49</td><td class="site">OLX.pl <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Énorme volume polonais, prix très bas</td></tr>
+          <tr><td class="n">50</td><td class="site">Allegro Lokalnie <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Pologne, section occasion</td></tr>
+          <tr><td class="n">51</td><td class="site">Bazos.cz</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">HTML rudimentaire = crawl trivial</td></tr>
+          <tr><td class="n">52</td><td class="site">Bazos.sk</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Même moteur</td></tr>
+          <tr><td class="n">53</td><td class="site">Aukro.cz</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Enchères tchèques</td></tr>
+          <tr><td class="n">54</td><td class="site">Jófogás.hu</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Hongrie</td></tr>
+          <tr><td class="n">55</td><td class="site">Hardverapró.hu <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Pépite : forum hardware hongrois, énorme sur les composants</td></tr>
+          <tr><td class="n">56</td><td class="site">OLX.ro</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Roumanie</td></tr>
+          <tr><td class="n">57</td><td class="site">Okazii.ro</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Roumanie</td></tr>
+          <tr><td class="n">58</td><td class="site">OLX.bg</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Bulgarie</td></tr>
+          <tr><td class="n">59</td><td class="site">Bolha.com</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Slovénie</td></tr>
+          <tr><td class="n">60</td><td class="site">Njuškalo.hr</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Croatie</td></tr>
+          <tr><td class="n">61</td><td class="site">Kupujemprodajem</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Serbie</td></tr>
+          <tr><td class="n">62</td><td class="site">OLX.ua</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Ukraine — logistique compliquée, à évaluer</td></tr>
+          <tr><td class="n">63</td><td class="site">Skelbiu.lt</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Lituanie</td></tr>
+          <tr><td class="n">64</td><td class="site">SS.lv</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Lettonie</td></tr>
+          <tr><td class="n">65</td><td class="site">Osta.ee</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Estonie</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🌍 Communautés &amp; forums — le meilleur ratio signal/bruit</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">66</td><td class="site">r/hardwareswap <span class="star">★</span></td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">API officielle gratuite, JSON propre, zéro anti-bot</td></tr>
+          <tr><td class="n">67</td><td class="site">r/buildapcsales <span class="star">★</span></td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Idem</td></tr>
+          <tr><td class="n">68</td><td class="site">r/hardwareswapfr</td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Francophone</td></tr>
+          <tr><td class="n">69</td><td class="site">r/hardwareswapuk</td><td><span class="chip t0">T0</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Idem</td></tr>
+          <tr><td class="n">70</td><td class="site">r/hardwareswapEU</td><td><span class="chip t0">T0</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Idem</td></tr>
+          <tr><td class="n">71</td><td class="site">r/pcmasterrace</td><td><span class="chip t0">T0</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Flair sale, bruyant</td></tr>
+          <tr><td class="n">72</td><td class="site">LinusTechTips</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Buy/Sell international</td></tr>
+          <tr><td class="n">73</td><td class="site">Level1Techs</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Marketplace technique</td></tr>
+          <tr><td class="n">74</td><td class="site">AnandTech Forums</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">FS/FT, historique</td></tr>
+          <tr><td class="n">75</td><td class="site">Overclock.net</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Enthousiastes</td></tr>
+          <tr><td class="n">76</td><td class="site">Groupes Discord/Telegram FR</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Via bots publics</td></tr>
+          <tr><td class="n">77</td><td class="site">Hardware.info — V&amp;A</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Complément de Tweakers</td></tr>
+          <tr><td class="n">78</td><td class="site">Forum-3DCenter.org</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Niche allemande pointue</td></tr>
+          <tr><td class="n">79</td><td class="site">Discords deals</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Optionnel</td></tr>
+          <tr><td class="n">80</td><td class="site">Dealabs.com <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Pas du C2C, mais les erreurs de prix marchands y remontent en minutes</td></tr>
+          <tr><td class="n">81</td><td class="site">mydealz / pepper / hotukdeals</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Même réseau, versions DE/PL/UK</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🇺🇸🇨🇦 Amérique du Nord — surtout pour calibrer la référence</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">82</td><td class="site">eBay.com <span class="star">★</span></td><td><span class="chip t0">T0</span></td><td><span class="chip p1">P1</span></td><td class="note-col">API. Sert surtout à calibrer le prix de référence mondial</td></tr>
+          <tr><td class="n">83</td><td class="site">Craigslist ×15 villes</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">RSS natif par ville → crawl trivial</td></tr>
+          <tr><td class="n">84</td><td class="site">OfferUp.com</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Mobile-first, API interne</td></tr>
+          <tr><td class="n">85</td><td class="site">Mercari.com</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Volume</td></tr>
+          <tr><td class="n">86</td><td class="site">Swappa.com</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Propre, modéré, peu d'arnaques</td></tr>
+          <tr><td class="n">87</td><td class="site">Kijiji.ca</td><td><span class="chip t2">T2</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Canada</td></tr>
+          <tr><td class="n">88</td><td class="site">FB Marketplace US</td><td><span class="chip t3">T3</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Même adapter que #4</td></tr>
+          <tr><td class="n">89</td><td class="site">eBay.ca</td><td><span class="chip t0">T0</span></td><td><span class="chip p3">P3</span></td><td class="note-col">API</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>🔧 Référence prix — pas des sources de deals</h3>
+      <p>Indispensables pour savoir ce qu'est un prix « normal ». Ils fournissent la borne haute du
+        modèle, surtout au démarrage quand le corpus C2C est encore vide.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>#</th><th>Site</th><th>T</th><th>P</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td class="n">90</td><td class="site">Amazon.fr / .de</td><td><span class="chip t3">T3</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Prix neuf de référence</td></tr>
+          <tr><td class="n">91</td><td class="site">LDLC.com <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Prix neuf FR, HTML stable, sert de plafond</td></tr>
+          <tr><td class="n">92</td><td class="site">Materiel.net</td><td><span class="chip t1">T1</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Idem</td></tr>
+          <tr><td class="n">93</td><td class="site">Topachat.com</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Idem</td></tr>
+          <tr><td class="n">94</td><td class="site">Newegg.com</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Référence US</td></tr>
+          <tr><td class="n">95</td><td class="site">Geizhals.de <span class="star">★</span></td><td><span class="chip t1">T1</span></td><td><span class="chip p1">P1</span></td><td class="note-col">Le meilleur référentiel prix hardware d'Europe</td></tr>
+          <tr><td class="n">96</td><td class="site">Idealo.fr / .de</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Comparateur</td></tr>
+          <tr><td class="n">97</td><td class="site">PCPartPicker</td><td><span class="chip t1">T1</span></td><td><span class="chip p2">P2</span></td><td class="note-col">Historique de prix, utile pour les tendances</td></tr>
+          <tr><td class="n">98</td><td class="site">Caseking.de</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Revendeur DE</td></tr>
+          <tr><td class="n">99</td><td class="site">Alternate.de</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Revendeur DE</td></tr>
+          <tr><td class="n">100</td><td class="site">Mindfactory.de</td><td><span class="chip t1">T1</span></td><td><span class="chip p3">P3</span></td><td class="note-col">Prix agressifs</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Ce que cette liste implique</h3>
+      <div class="note good">
+        <span class="note-label">L'essentiel</span>
+        <p><strong>~100 sources ≈ 25 adapters, pas 100.</strong> Les OLX-likes partagent le même
+          moteur (OLX.pl/ro/bg/pt/ua, Bazos.cz/sk, 2dehands, Marktplaats) → un adapter générique
+          paramétré en couvre ~15 d'un coup. Idem pour les forums vBulletin/XenForo (~12) et les
+          eBay via API (~7 en changeant un paramètre). C'est ce qui rend la cible tenable.</p>
+      </div>
+      <ul>
+        <li><strong>~40 sources sont en T0/T1</strong> — API ou HTML simple, crawl quasi gratuit,
+          aucun risque de blocage. Les forums et les sites d'Europe centrale sont les plus faciles.</li>
+        <li><strong>Les pépites ne sont pas les gros sites :</strong> Hardverapró (HU), Tweakers (NL),
+          Sweclockers (SE), Hardwareluxx (DE), Geektroc (FR), Overclockers UK. Peu de concurrence
+          d'acheteurs automatisés, vendeurs particuliers, et des prix parfois anciens jamais
+          réajustés à la flambée de la DDR5.</li>
+        <li><strong>Priorité 1 = 12 sources</strong> qui couvrent déjà l'essentiel du volume
+          exploitable.</li>
+      </ul>
+    </section>
+
+    <!-- 04 -->
+    <section id="specs">
+      <h2><span class="num">04</span>Extraction des specs</h2>
+      <p class="deck">Regex d'abord, LLM en secours. Puis les garde-fous — c'est eux qui font la
+        différence entre un outil utilisable et un flux de faux positifs.</p>
+
+      <h3>Étape 1 — regex, ~90 % de couverture</h3>
+      <pre class="code">génération   /\bDDR(3|4|5)\b/i, /\bPC5-\d{4,5}\b/   → DDR5
+kit          /(\d)\s*[xX*]\s*(\d{1,3})\s*(?:GB|GO)/  → 2x16
+fréquence    /(\d{4,5})\s*(?:MHZ|MT\/S)/             → 6000
+latence      /\bCL\s?(\d{2})\b/                      → 30
+form factor  /\bSO-?DIMM\b/                          → laptop
+ECC/RDIMM    /\b(ECC|RDIMM|LRDIMM)\b/                → serveur, autre marché</pre>
+
+      <h3>Étape 2 — LLM local via LM Studio</h3>
+      <p>Pour les 10 % restants (« vends barrettes gaming rgb pc neuf jamais servi ») et les annonces
+        en langue étrangère. LM Studio expose une API OpenAI-compatible : côté code, c'est le SDK
+        OpenAI pointé sur localhost, sans clé et sans appel sortant.</p>
+      <pre class="code">const llm = new OpenAI({
+  baseURL: process.env.LLM_BASE_URL,   <span class="c">// http://host.docker.internal:1234/v1</span>
+  apiKey: 'lm-studio',                 <span class="c">// ignoré en local</span>
+})
+
+const res = await llm.chat.completions.create({
+  model: process.env.LLM_MODEL,
+  messages: [{ role: 'user', content: prompt }],
+  response_format: {                   <span class="c">// sortie contrainte, pas de JSON cassé</span>
+    type: 'json_schema',
+    json_schema: { name: 'ram_spec', schema: RAM_SPEC_SCHEMA, strict: true },
+  },
+  temperature: 0,                      <span class="c">// extraction : zéro créativité</span>
+})</pre>
+      <p>Deux rôles : <strong>traduction/normalisation</strong> (PL, CZ, HU, SE — à elle seule, elle
+        débloque une vingtaine de sources) et <strong>extraction sur titres ambigus</strong>. Le
+        Gemma 12B QAT suffit pour les deux ; on n'ajoutera un petit modèle rapide que s'il se révèle
+        trop lent. Le volume est faible et le résultat mis en cache par hash de titre.</p>
+      <p><strong>Le client est agnostique</strong> — n'importe quel serveur OpenAI-compatible marche.
+        Si LM Studio n'est pas lancé, le worker le détecte et tourne en mode regex seul : les annonces
+        non parsées attendent en <code>needs_review</code>. Rien ne casse.</p>
+
+      <h3>Étape 3 — les garde-fous</h3>
+      <div class="note warn">
+        <span class="note-label">Sans ça, l'outil est inutilisable</span>
+        <ul style="margin-bottom:0">
+          <li>Exclure les <strong>annonces de recherche</strong> : <code>cherche</code>,
+            <code>achète</code>, <code>WTB</code>, <code>suche</code>, <code>busco</code></li>
+          <li>Exclure le <strong>HS / pour pièces</strong> : <code>HS</code>,
+            <code>ne fonctionne pas</code>, <code>faulty</code>, <code>as-is</code></li>
+          <li>Exclure <strong>SO-DIMM</strong> et <strong>ECC/RDIMM</strong> du calcul de référence —
+            ce sont des marchés distincts</li>
+          <li>Détecter les <strong>prix « à partir de »</strong>, les lots, les annonces sans prix</li>
+          <li>Détecter la <strong>confusion kit/barrette</strong> → <code>spec_confidence: low</code></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- 05 -->
+    <section id="anomalie">
+      <h2><span class="num">05</span>Détection d'anomalie de prix</h2>
+      <p class="deck">Le prix de référence est calculé depuis le corpus lui-même, jamais codé en dur —
+        la DDR5 a vu son prix multiplié en quelques mois, tout seuil statique serait faux en deux
+        semaines.</p>
+
+      <p><strong>Bucket</strong> = (génération, capacité totale, tranche de fréquence, ECC ?).
+        Par exemple <code>DDR5 / 32GB / 5600-6400 / non-ECC</code>. Pour chaque bucket, sur une
+        fenêtre glissante de 30 jours recalculée toutes les heures :</p>
+      <pre class="code">median_ppg = médiane du prix/GB              <span class="c">// robuste, pas la moyenne</span>
+mad        = median(|x - median|) × 1.4826   <span class="c">// écart-type robuste</span>
+
+discount   = (median_ppg - listing_ppg) / median_ppg
+z          = (listing_ppg - median_ppg) / mad
+deal_score = 100 × clamp(discount, 0, 1) × confidence × friction</pre>
+
+      <p>Un listing est <strong>alerté</strong> si <code>z &lt; -2.5</code> <strong>et</strong>
+        <code>discount &gt; 30 %</code>, <strong>et</strong> le bucket a ≥ 30 observations sur 30 j,
+        <strong>et</strong> <code>spec_confidence ≥ medium</code>, <strong>et</strong> il n'a pas déjà
+        été alerté. Seuils volontairement conservateurs au départ : mieux vaut rater un deal que
+        crouler sous le bruit. On desserrera après la première journée de test.</p>
+
+      <div class="note">
+        <span class="note-label">Bootstrap</span>
+        <p>Tant que le corpus est vide, aucun bucket n'atteint 30 observations et rien n'est alerté.
+          Les sources de référence prix (#90-100) donnent immédiatement une borne haute : on alerte
+          dès le jour 1 sur la règle « occasion &lt; 45 % du neuf équivalent », puis on bascule sur
+          le modèle médiane/MAD dès que les buckets se remplissent, en une semaine environ.</p>
+      </div>
+
+      <p><strong>Filtre anti-arnaque :</strong> un prix sous le p1 du bucket — 64 Go DDR5 à 25 € — est
+        presque toujours une arnaque. On ne le cache pas, on l'affiche avec un badge
+        <em>⚠️ Trop beau, méfiance</em> plutôt que de le mettre en tête de liste.</p>
+      <p><strong>Pondération géographique :</strong> une annonce polonaise à -50 % n'est pas la même
+        affaire qu'une lyonnaise à -40 %. Chaque source porte un <code>friction_score</code> — 1,0
+        pour la France en main propre, ~0,75 pour l'UE avec envoi, ~0,5 hors UE. Désactivable dans
+        les filtres.</p>
+      <p><strong>Frais de port</strong> intégrés quand disponibles, sinon flag
+        <code>shipping_unknown</code> affiché. <strong>Devises</strong> converties en EUR au taux du
+        jour (API BCE, cache 24 h), montant original conservé.</p>
+    </section>
+
+    <!-- 06 -->
+    <section id="schema">
+      <h2><span class="num">06</span>Schéma de base</h2>
+      <p class="deck">Postgres, huit tables, avec les index qui comptent pour trier des dizaines de
+        milliers d'annonces par score.</p>
+      <pre class="code">sources(id, slug, name, country, currency, tier, effective_tier, enabled,
+        rate_limit_ms, friction_score, last_run_at, consecutive_failures, cooldown_until)
+
+crawl_runs(id, source_id, started_at, finished_at, status, pages_fetched,
+           listings_found, listings_new, error, blocked_reason, tier_used)
+
+listings(id, source_id, external_id, url, title, description, price_cents, currency,
+         price_eur_cents, shipping_cents, image_url, location, country,
+         posted_at, first_seen_at, last_seen_at, is_active, raw jsonb,
+         UNIQUE(source_id, external_id))
+
+listing_specs(listing_id PK, ddr_gen, total_gb, modules, gb_per_module, speed_mhz, cl,
+              form_factor, is_ecc, brand, confidence, parsed_by)
+
+price_reference(bucket_key PK, window_start, window_end, n_obs,
+                median_ppg_cents, mad_ppg_cents, p10, p25, updated_at)
+
+deals(listing_id PK, bucket_key, ppg_cents, discount_pct, z_score, deal_score,
+      flags text[], detected_at)
+
+alerts(id, listing_id, channel, sent_at, status)
+watches(id, name, filters jsonb, min_discount, channels text[], enabled)</pre>
+      <p>Index critiques : <code>deals(deal_score DESC, detected_at DESC)</code>,
+        <code>listings(last_seen_at)</code>, <code>listing_specs(ddr_gen, total_gb)</code>.</p>
+    </section>
+
+    <!-- 07 -->
+    <section id="ordo">
+      <h2><span class="num">07</span>Ordonnancement</h2>
+      <p class="deck">Des jobs BullMQ répétables, et une règle qui évite de se faire bannir au premier
+        redémarrage.</p>
+      <pre class="code">crawl:source:{id}   20-60 min selon la source, + jitter ±25 %
+parse:listing       à l'insertion
+refresh:reference   toutes les heures  →  detect:deals
+notify:dispatch     toutes les 2 min (batch, évite le spam)
+recheck:active      6×/jour sur le top → marquer sold/removed
+
+<span class="c">— files —</span>
+crawl:http     concurrence 8    sources T0/T1, léger
+crawl:browser  concurrence 4-8  Camoufox, ~400 Mo chacun
+parse:llm      concurrence 1    LM Studio ; sautée s'il n'est pas lancé</pre>
+      <p>Le facteur limitant n'est jamais le CPU mais le rate limiting volontaire : on <em>veut</em>
+        rester lent. Les 100 sources tiennent largement dans une heure, même à 4 navigateurs.</p>
+
+      <div class="note warn">
+        <span class="note-label">Le point de design central</span>
+        <p><strong>Coalescing au démarrage.</strong> Si le PC a été éteint 12 h, on ne rejoue pas les
+          12 runs manqués. Le scheduler ne garde qu'un run par source. Sans ça, l'allumage
+          déclencherait une rafale de ~1 200 requêtes — exactement le signal qu'un antibot cherche.
+          C'est le meilleur moyen de se faire bannir en une seule fois.</p>
+        <p><strong>Démarrage échelonné :</strong> les premiers runs sont étalés sur 20 min, pas lancés
+          tous à la seconde zéro.</p>
+      </div>
+      <p><strong>Conséquence assumée :</strong> une RAM à -50 % sur leboncoin part en quelques
+        dizaines de minutes. On ne verra que ce qui passe pendant que le PC tourne. Comme les
+        particuliers postent surtout le soir et le week-end, la couverture reste bonne.</p>
+    </section>
+
+    <!-- 08 -->
+    <section id="front">
+      <h2><span class="num">08</span>Frontend</h2>
+      <p class="deck">Le front ne déclenche jamais un crawl. Il lit la base, et poll
+        <code>/api/deals</code> toutes les 60 secondes.</p>
+      <ul>
+        <li><strong>Dashboard</strong> — grille de cartes triées par <code>deal_score</code> : image,
+          titre, prix, <strong>€/GB</strong>, badge <em>-45 % vs marché</em>, site, ville, âge de
+          l'annonce, lien vers l'annonce. Toast quand un nouveau deal entre dans le top.</li>
+        <li><strong>Filtres</strong> en URL, donc partageables : génération, capacité (16/32/48/64/96),
+          config kit (2×16, 1×32…), fréquence min, prix max, remise min, pays, exclure SO-DIMM.</li>
+        <li><strong>Détail d'un deal</strong> — historique du prix de référence du bucket, annonces
+          comparables.</li>
+        <li><strong>Watches</strong> — « DDR5 2×16 ≥ 6000 MHz, remise &gt; 35 %, FR+DE » → Telegram.</li>
+        <li><strong>Santé des sources</strong> — dernier run, taux de succès 24 h, tier effectif,
+          statut bloqué. Avec 100 sources, c'est <em>l'</em>outil de maintenance : sans elle, on ne
+          voit pas qu'un site a changé son HTML et ne retourne plus rien depuis trois jours.</li>
+      </ul>
+      <p>Les CDN des marketplaces bloquent souvent le hotlink → route <code>/api/img</code> qui refetch
+        et cache 24 h.</p>
+    </section>
+
+    <!-- 09 -->
+    <section id="notif">
+      <h2><span class="num">09</span>Notifications</h2>
+      <p class="deck">Sur un vrai bon deal, la fenêtre est de quelques minutes. Le canal compte.</p>
+      <ol>
+        <li><strong>Telegram</strong> — bot + <code>chat_id</code>, message avec photo, prix, €/GB,
+          remise, lien direct. Latence &lt; 5 s, gratuit, illimité. C'est du <strong>sortant
+          uniquement</strong> : les alertes arrivent sur le mobile où qu'on soit, sans rien exposer
+          sur la box.</li>
+        <li><strong>Web Push</strong> — utile seulement avec le navigateur ouvert.</li>
+        <li><strong>Digest</strong> du top 10 à chaque démarrage du PC : « voilà ce qui est passé
+          pendant ton absence ». Particulièrement adapté à un setup intermittent.</li>
+      </ol>
+      <p>Anti-spam : dédup par listing, max 20 alertes/h, regroupement si plus de 3 deals en 2 min.</p>
+    </section>
+
+    <!-- 10 -->
+    <section id="phasage">
+      <h2><span class="num">10</span>Phasage</h2>
+      <p class="deck">Tant qu'on ne sait pas si ça trouve vraiment des bons plans, tout le reste est
+        du travail spéculatif. Le phasage est taillé pour un premier verdict rapide.</p>
+
+      <div class="stages">
+        <div class="stage primary">
+          <span class="tag">Étape 1 — l'essentiel du travail</span>
+          <h3>Le MVP verdict</h3>
+          <p>Une seule question : en laissant tourner une journée, est-ce que des annonces réellement
+            sous-cotées remontent ?</p>
+          <div class="scroll"><table>
+            <tbody>
+              <tr><td class="site">Socle</td><td class="note-col">Monorepo, un <code>docker-compose.yml</code>, Postgres + Redis + Drizzle, doc setup WSL2</td></tr>
+              <tr><td class="site">Crawl</td><td class="note-col">Ladder T0→T3, registre de sources, <strong>6 sources</strong> : eBay API, r/hardwareswap, Kleinanzeigen, leboncoin, Tweakers, Geektroc</td></tr>
+              <tr><td class="site">Parsing</td><td class="note-col">Regex + garde-fous + fallback LM Studio</td></tr>
+              <tr><td class="site">Référence</td><td class="note-col">Médiane/MAD par bucket, bootstrap sur LDLC + Geizhals</td></tr>
+              <tr><td class="site">Sortie</td><td class="note-col">Dashboard minimal trié par score. Pas de filtres, pas de watches</td></tr>
+              <tr><td class="site">Alerte</td><td class="note-col">Telegram sur les deals au-dessus du seuil</td></tr>
+            </tbody>
+          </table></div>
+          <p style="margin-top:16px">Ces 6 sources couvrent tout l'éventail technique — API, HTML
+            simple, T2 furtif, T3 DataDome. Si les quatre mécaniques marchent, ajouter les 94 autres
+            est mécanique. <strong>leboncoin est dedans dès le départ :</strong> c'est le seul vrai
+            risque technique, autant le lever tout de suite.</p>
+        </div>
+
+        <div class="stage">
+          <span class="tag">Étape 2 — si le verdict est bon</span>
+          <h3>Volume et confort</h3>
+          <p>Montée vers les ~100 sources (l'adapter OLX-like en couvre 15 d'un coup, les forums 12).
+            Filtres, page détail, page santé des sources. Watches paramétrables. Petit modèle de
+            traduction pour débloquer les sources d'Europe centrale et nordique.</p>
+        </div>
+
+        <div class="stage">
+          <span class="tag">Étape 3 — si ça accroche</span>
+          <h3>Autonomie</h3>
+          <p>Circuit breakers affinés, tests de non-régression des sélecteurs, alerte « source
+            muette », <code>recheck:active</code> pour marquer les vendus, réveil programmé Windows.</p>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="note-label">Les trois issues du test</span>
+        <p><strong>(a)</strong> des vraies affaires remontent → on continue.
+          <strong>(b)</strong> ça remonte du bruit → c'est du réglage de seuils.
+          <strong>(c)</strong> rien ne remonte parce que le marché est efficient sur ces 6 gros
+          sites → <em>c'est une information précieuse</em>, et elle oriente vers les sources de niche,
+          là où les vendeurs réajustent le moins leurs prix.</p>
+      </div>
+      <p><strong>Non négociable dès l'étape 1</strong>, même pour un projet perso : le rate limiting
+        et le circuit breaker. Pas par excès de rigueur — juste parce qu'un ban de l'IP sur leboncoin
+        serait pénible personnellement, et que c'est 20 lignes de code.</p>
+    </section>
+
+    <!-- 11 -->
+    <section id="couts">
+      <h2><span class="num">11</span>Coûts et ressources</h2>
+      <p class="deck">Zéro euro récurrent. La seule ressource réellement disputée, c'est la VRAM.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Poste</th><th class="num-cell">Coût</th></tr></thead>
+        <tbody>
+          <tr><td>PC Windows</td><td class="num-cell">déjà possédé</td></tr>
+          <tr><td>Postgres, Redis, Firecrawl, Camoufox, Next.js</td><td class="num-cell">0 €</td></tr>
+          <tr><td>LM Studio + modèles</td><td class="num-cell">0 €</td></tr>
+          <tr><td>Telegram Bot API</td><td class="num-cell">0 €</td></tr>
+          <tr><td>eBay Browse API (5 000 appels/j) · API Reddit</td><td class="num-cell">0 €</td></tr>
+          <tr><td><strong>Total</strong></td><td class="num-cell"><strong>0 €/mois</strong></td></tr>
+        </tbody>
+      </table></div>
+      <p><strong>Le seul coût réel est l'électricité</strong>, marginal si le PC est allumé de toute
+        façon. En 24/7 avec du crawl léger : ~10-16 €/mois. En usage normal — allumé le soir et le
+        week-end — le surcoût du crawl est de quelques centimes : c'est de l'attente réseau.</p>
+
+      <h3>Budget mémoire sur 32 Go</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Service</th><th class="num-cell">RAM</th></tr></thead>
+        <tbody>
+          <tr><td>Postgres</td><td class="num-cell">~300 Mo</td></tr>
+          <tr><td>Redis</td><td class="num-cell">~100 Mo</td></tr>
+          <tr><td>Next.js</td><td class="num-cell">~200 Mo</td></tr>
+          <tr><td>Worker Node</td><td class="num-cell">~250 Mo</td></tr>
+          <tr><td>Firecrawl</td><td class="num-cell">~500 Mo</td></tr>
+          <tr><td>Camoufox × 8</td><td class="num-cell">~3,2 Go</td></tr>
+          <tr><td><strong>Sous-total Docker/WSL2</strong></td><td class="num-cell"><strong>≈ 4,5 Go</strong></td></tr>
+          <tr><td>LM Studio (côté Windows)</td><td class="num-cell">~1-2 Go</td></tr>
+        </tbody>
+      </table></div>
+      <p>Il reste <strong>~25 Go</strong> pour l'usage normal, et <code>.wslconfig</code> plafonné à
+        12 Go empêche WSL2 de déborder. Stockage négligeable : ~2 Go après un an, puisqu'on ne stocke
+        pas les images mais leurs URLs.</p>
+      <p><strong>VRAM (12 Go)</strong> : le Gemma 12B QAT occupe ~8 Go et laisse de la marge. C'est la
+        seule ressource disputée — pour jouer pendant un crawl, il suffit de décharger le modèle
+        depuis LM Studio, le worker bascule tout seul en mode regex.</p>
+    </section>
+
+    <!-- 12 -->
+    <section id="risques">
+      <h2><span class="num">12</span>Risques</h2>
+      <div class="scroll"><table>
+        <thead><tr><th>Risque</th><th>Mitigation</th></tr></thead>
+        <tbody>
+          <tr>
+            <td class="site" style="color:var(--clay)">Ban de l'IP résidentielle</td>
+            <td class="note-col"><strong>Le risque n°1.</strong> Il impacterait la navigation
+              personnelle. Circuit breaker au premier signal, 1 req/15-30 s, jamais de parallélisme
+              par domaine, horaires 7h-minuit. Recours : redémarrage box, WARP</td>
+          </tr>
+          <tr>
+            <td class="site">Rafale au redémarrage</td>
+            <td class="note-col">Coalescing des jobs en retard — un run par source, pas 12. Sans ça,
+              c'est le ban assuré</td>
+          </tr>
+          <tr>
+            <td class="site">Site qui change son HTML</td>
+            <td class="note-col">Canary : alerte si une source retourne 0 résultat 2 runs de suite
+              alors qu'elle en retournait plus de 10</td>
+          </tr>
+          <tr>
+            <td class="site">Faux positifs</td>
+            <td class="note-col">Garde-fous d'extraction, seuil de confiance, badge arnaque</td>
+          </tr>
+          <tr>
+            <td class="site">Référence instable au début</td>
+            <td class="note-col">Pas d'alerte sous 30 observations par bucket ; bootstrap sur les prix
+              neufs comme borne haute</td>
+          </tr>
+          <tr>
+            <td class="site">PC éteint</td>
+            <td class="note-col">Assumé, c'est le mode d'usage prévu. Coalescing, démarrage échelonné,
+              digest Telegram au réveil</td>
+          </tr>
+          <tr>
+            <td class="site">LM Studio pas lancé</td>
+            <td class="note-col">Détecté au démarrage → mode regex seul, annonces en
+              <code>needs_review</code>. Aucune erreur</td>
+          </tr>
+          <tr>
+            <td class="site">Docker/WSL2 qui plante</td>
+            <td class="note-col"><code>restart: unless-stopped</code> ; worker idempotent, jobs dans
+              Redis persisté sur volume — rien ne se perd</td>
+          </tr>
+          <tr>
+            <td class="site">Le deal est parti</td>
+            <td class="note-col">Inhérent au mode intermittent. Telegram en priorité,
+              <code>recheck:active</code> pour marquer les vendus</td>
+          </tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- 13 -->
+    <section id="defauts">
+      <h2><span class="num">13</span>Défauts retenus</h2>
+      <p class="deck">Aucune de ces décisions n'est bloquante. On démarre avec ces valeurs et on
+        ajuste — le registre de sources rend l'activation d'un site triviale, et les seuils sont en
+        config.</p>
+      <div class="scroll"><table>
+        <thead><tr><th>Question</th><th>Défaut</th><th>Pourquoi</th></tr></thead>
+        <tbody>
+          <tr><td class="site">Périmètre géo</td><td><strong>FR + DE + Benelux + UK</strong></td><td class="note-col">Meilleur ratio volume/faisabilité ; l'Europe entière à l'étape 2</td></tr>
+          <tr><td class="site">DDR5 seule ?</td><td><strong>Les deux</strong>, filtre DDR5 par défaut</td><td class="note-col">Collecter la DDR4 ne coûte rien, et elle a flambé aussi</td></tr>
+          <tr><td class="site">Modèle LLM</td><td><strong>Gemma 12B QAT</strong> pour les deux rôles</td><td class="note-col">Petit modèle de traduction seulement s'il se révèle lent</td></tr>
+          <tr><td class="site">Seuil d'alerte</td><td>remise &gt; 30 % <strong>et</strong> z &lt; -2.5</td><td class="note-col">Conservateur au début : mieux vaut rater un deal que crouler sous le bruit</td></tr>
+          <tr><td class="site">Accès mobile</td><td>Tailscale, en option</td><td class="note-col">10 min, gratuit, mais pas nécessaire pour le verdict</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Ce que le tout-local implique</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Aspect</th><th>Setup cloud payant</th><th>Ce plan</th><th>Impact</th></tr></thead>
+        <tbody>
+          <tr><td class="site">Furtivité</td><td>Camoufox</td><td>Camoufox</td><td class="note-col">aucun — même outil</td></tr>
+          <tr><td class="site">Orchestration</td><td>Firecrawl cloud</td><td>Firecrawl self-hosted</td><td class="note-col">aucun</td></tr>
+          <tr><td class="site">IP résidentielle</td><td>proxies ~8 €/Go</td><td>la box</td><td class="note-col">aucun sur la qualité ; une seule IP à ménager</td></tr>
+          <tr><td class="site">DataDome</td><td><code>proxy: stealth</code></td><td>Camoufox + IP résidentielle</td><td class="note-col">aucun — même recette</td></tr>
+          <tr><td class="site">Parsing LLM</td><td>API payante</td><td>Gemma 12B QAT</td><td class="note-col">quasi équivalent sur une extraction cadrée</td></tr>
+          <tr><td class="site" style="color:var(--clay)">Disponibilité</td><td>100 %</td><td>PC allumé uniquement</td><td class="note-col"><strong>le seul vrai renoncement</strong></td></tr>
+          <tr><td class="site">Ops</td><td>zéro</td><td>1 × <code>docker compose</code></td><td class="note-col">quelques heures de setup</td></tr>
+        </tbody>
+      </table></div>
+      <p>Tout le reste est équivalent, voire meilleur : l'IP résidentielle et le GPU sont des atouts
+        que le setup cloud payant n'a pas gratuitement. Et le renoncement se compense — les
+        particuliers postent le soir et le week-end, c'est-à-dire quand le PC est allumé.</p>
+    </section>
+
+  </main>
+
+  <footer>Plan technique · RAM Deal Hunter · docs/PLAN.md</footer>
+</div>
