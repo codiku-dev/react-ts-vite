@@ -33,14 +33,19 @@ parsing LLM, **32 Go de RAM** pour faire tourner 8 navigateurs sans le sentir.
    │                              │  └ playwright-service → │   │
    │                              │    Camoufox × 8 (Xvfb)  │   │
    │                              └─────────────────────────┘   │
-   │                 ┌──────────────────────────────┐           │
-   │                 │ Ollama + Qwen2.5-14B (CUDA)  │           │
-   │                 └──────────────────────────────┘           │
+   │        ┌──────────────────────────────────────────────┐    │
+   │        │ LM Studio (mode serveur, hors Docker)        │    │
+   │        │  API OpenAI-compatible → localhost:1234/v1   │    │
+   │        │  Gemma 12B QAT (+ petit modèle traduction)   │    │
+   │        └──────────────────────────────────────────────┘    │
    └────────────────────────┬─────────────────────┬─────────────┘
                             │                     │
                     IP RÉSIDENTIELLE FR    Telegram Bot API
                      (vers les 100 sites)   (alertes sur ton tel)
 ```
+
+> Note WSL2 : depuis un conteneur, LM Studio (qui tourne côté Windows) s'atteint via
+> `http://host.docker.internal:1234/v1`. C'est la valeur par défaut de `LLM_BASE_URL`.
 
 **Ce que le tout-local simplifie :** plus de tunnel, plus de deuxième compose, plus de reverse proxy,
 plus de HTTPS, plus d'authentification (le dashboard écoute sur `localhost:3000`, personne d'autre
@@ -59,8 +64,6 @@ selon son scheduler, le dashboard poll `/api/deals` toutes les 60 s.
 
 ### Stack (tout gratuit)
 
-| Couche | Choix | Coût | Pourquoi |
-|---|---|---|---|
 | Couche | Choix | Pourquoi |
 |---|---|---|
 | Front | Next.js 15 App Router, TS, Tailwind, shadcn/ui | RSC, une seule codebase, sert sur `localhost:3000` |
@@ -69,26 +72,28 @@ selon son scheduler, le dashboard poll `/api/deals` toutes les 60 s.
 | Crawl T0/T1 | `undici` + `curl-impersonate` (ou `impit`) | TLS/JA3 d'un vrai navigateur, ~0 CPU |
 | Crawl T2 | **camoufox-js + Playwright** | open source (MPL), fingerprint patché en C++ |
 | Crawl T3 | **Firecrawl self-hosted** + `playwright-service` custom pilotant Camoufox | orchestration sans clé API |
-| Parsing specs | regex d'abord, **Ollama + Qwen2.5-14B-Instruct Q4_K_M** en fallback | ~9 Go des 12 Go de VRAM du 4070, ~40 tok/s → qualité proche d'une API payante |
+| Parsing specs | regex d'abord, **LM Studio en mode serveur** en fallback | déjà installé chez toi, API OpenAI-compatible sur `localhost:1234/v1`, modèles gérés depuis la GUI |
 | Notif | **Telegram Bot API** | instantané, sur ton téléphone même quand tu n'es pas devant le PC |
 | Accès mobile | **Tailscale** (optionnel) | dashboard depuis le tel, zéro port ouvert sur la box |
 | Taux de change | API **frankfurter.app** (BCE, sans clé) | cache 24 h |
 
 ### Le PC sous Windows, concrètement
 
-- **WSL2 + Docker Desktop** avec l'intégration WSL activée. Camoufox tourne en Linux dans WSL2
-  (bien plus stable que le portage Windows natif) ; le GPU est exposé à WSL2 par le driver NVIDIA,
-  donc Ollama y accède en CUDA sans configuration particulière.
-- **Empêcher la mise en veille** pendant les sessions de crawl :
+- **WSL2 + Docker Desktop** avec l'intégration WSL activée. Camoufox tourne en Linux dans WSL2,
+  bien plus stable que le portage Windows natif.
+- **LM Studio reste côté Windows**, hors Docker — tu gardes la GUI pour charger/décharger tes
+  modèles, et le GPU sans passer par WSL2. Le worker l'appelle via `host.docker.internal:1234`.
+- **Démarrage** : Docker Desktop au login + `restart: unless-stopped` sur tous les conteneurs.
+  Tu allumes le PC, tu lances le serveur LM Studio si tu veux le parsing LLM, et le crawl reprend
+  tout seul. Rien d'autre à faire.
+- **Empêcher la mise en veille** pendant une journée de test :
   `powercfg /change standby-timeout-ac 0`. L'écran peut s'éteindre, pas la machine.
-- **Démarrage auto** : Docker Desktop au login + `restart: unless-stopped` sur tous les conteneurs.
-  Tu allumes le PC, le crawl reprend tout seul, tu n'as rien à lancer.
 - **Limiter la RAM de WSL2** dans `.wslconfig` (ex. `memory=12GB`) pour qu'il ne grignote pas
   tes 32 Go quand tu joues.
-- **Le PC reste utilisable normalement** : le worker détecte une session interactive et plafonne
-  à 4 navigateurs (8 sinon), et met la file `parse:llm` en pause si le GPU est déjà chargé —
-  sinon Ollama et un jeu se disputeraient la VRAM. Le crawl lui-même est de l'attente réseau,
-  pas du calcul : tu ne le sentiras pas.
+- **Le PC reste utilisable normalement** : le worker plafonne à 4 navigateurs quand une session
+  interactive est détectée (8 sinon), et la file `parse:llm` est en concurrence 1 — si tu joues et
+  que LM Studio n'a pas de VRAM libre, le parsing attend simplement son tour. Le crawl lui-même est
+  de l'attente réseau, pas du calcul : tu ne le sentiras pas.
 
 ---
 
@@ -189,10 +194,11 @@ te gênerait toi, pas juste le bot. Toute la discipline du crawl découle de là
 
 ### Ce qui reste réellement dur
 
-Facebook Marketplace (login obligatoire + détection comportementale) et Leboncoin (DataDome agressif)
-sont les deux seuls qui coûteront cher. Pour eux : T3 systématique, fréquence réduite (1×/h max),
-et pour Leboncoin l'app mobile expose une API JSON plus permissive que le web — à explorer en priorité
-avant de payer du Firecrawl.
+Facebook Marketplace (login obligatoire + détection comportementale) et leboncoin (DataDome agressif)
+sont les deux seuls qui demanderont du travail. Pour eux : T3, fréquence réduite (1×/h max), et pour
+leboncoin **l'API JSON de l'app mobile est à explorer en premier** — elle est nettement plus
+permissive que le web, et si elle passe, tout le problème DataDome disparaît. C'est la première
+chose que je testerai à l'étape 1.
 
 ### Cadre
 
@@ -424,21 +430,51 @@ ECC/RDIMM    /\b(ECC|RDIMM|LRDIMM)\b/ → serveur, marché différent
 marque       Corsair|G.Skill|Kingston|Crucial|TeamGroup|Patriot|ADATA|Kingston Fury...
 ```
 
-**Étape 2 — LLM local sur le GPU** pour les 10 % non parsés (titres du genre
-"vends barrettes gaming rgb pc neuf jamais servi") : **Ollama + Qwen2.5-14B-Instruct Q4_K_M**
-sur la RTX 4070, sortie contrainte par JSON Schema, cache par hash de titre normalisé.
+**Étape 2 — LLM local via LM Studio** pour les 10 % non parsés (titres du genre
+"vends barrettes gaming rgb pc neuf jamais servi") et pour les annonces en langue étrangère.
 
-Le 4070 (12 Go de VRAM) fait tourner un 14B quantifié en Q4 (~9 Go) à ~40 tok/s. La sortie fait
-~80 tokens, donc ~2 s par annonce. À cette taille, la qualité d'extraction est très proche d'une
-API payante.
+LM Studio tourne **en mode serveur** et expose une API **OpenAI-compatible** sur
+`http://localhost:1234/v1`. Côté code, on utilise donc simplement le SDK OpenAI pointé sur ton
+localhost — aucune clé, aucun appel sortant :
 
-Cette étape sert aussi à **traduire/normaliser** les annonces en polonais, tchèque, hongrois ou
-suédois que les regex ne couvrent pas — ce qui débloque à lui seul une vingtaine des sources
-d'Europe centrale et nordique listées en §3.
+```ts
+// packages/core/src/llm/client.ts
+const llm = new OpenAI({
+  baseURL: process.env.LLM_BASE_URL ?? 'http://localhost:1234/v1',
+  apiKey: 'lm-studio',            // ignoré en local, mais requis par le SDK
+})
 
-La file `parse:llm` a une concurrence de 1 et se met en pause si le GPU est déjà chargé (jeu en
-cours) : les annonces non parsées attendent en `needs_review` et sont traitées plus tard.
-Le pipeline ne bloque jamais.
+const res = await llm.chat.completions.create({
+  model: process.env.LLM_MODEL,   // le nom exact vient de l'onglet Server de LM Studio
+  messages: [{ role: 'user', content: prompt }],
+  response_format: {              // sortie contrainte : pas de JSON malformé à parser
+    type: 'json_schema',
+    json_schema: { name: 'ram_spec', schema: RAM_SPEC_SCHEMA, strict: true },
+  },
+  temperature: 0,                 // tâche d'extraction : zéro créativité souhaitée
+})
+```
+
+**Deux rôles, potentiellement deux modèles** (LM Studio sait charger à la demande) :
+
+| Rôle | Besoin | Modèle |
+|---|---|---|
+| **Traduction / normalisation** (PL, CZ, HU, SE…) | rapide, pas besoin d'être brillant | un petit modèle 3-4B, très rapide |
+| **Extraction de specs** sur titres ambigus | un peu de raisonnement | **ton Gemma 12B QAT** — la quantization QAT tient dans les 12 Go de VRAM en gardant une qualité proche du non-quantifié |
+
+Le volume est faible (quelques dizaines d'annonces par heure au maximum, et le résultat est mis en
+cache par hash de titre normalisé), donc même un modèle lent suffit largement. **Commence avec
+le seul Gemma 12B pour les deux rôles** — si tu le trouves trop lent, on bascule la traduction sur
+un petit modèle, c'est une variable d'environnement à changer.
+
+**Le client est agnostique** : n'importe quel serveur OpenAI-compatible marche (LM Studio, Ollama,
+llama.cpp, ou même une vraie API si un jour tu veux). Changer de modèle = changer `LLM_MODEL`.
+
+**Si LM Studio n'est pas lancé**, le worker le détecte au démarrage (ping sur `/v1/models`) et
+tourne en **mode regex seul** : les annonces non parsées vont dans `needs_review` et seront reprises
+au prochain run avec le serveur allumé. Rien ne casse, rien n'est perdu.
+
+La file `parse:llm` a une concurrence de 1 pour ne pas se battre avec un jeu pour la VRAM.
 
 **Étape 3 — garde-fous** (indispensables, c'est ce qui tue les faux positifs) :
 - exclure les **annonces de recherche** : `/\b(cherche|recherche|achète|wanted|suche|busco|WTB)\b/`
@@ -554,7 +590,7 @@ Files BullMQ, toutes sur le même Redis local :
 ```
 crawl:http    concurrence 8   → sources T0/T1 (API, HTML simple) — léger
 crawl:browser concurrence 4-8 → sources T2/T3 (Camoufox) — 400 Mo chacun
-parse:llm     concurrence 1   → Ollama, en pause si le GPU est occupé
+parse:llm     concurrence 1   → LM Studio ; sautée si le serveur n'est pas lancé
 detect, notify, refresh:reference → concurrence 1, quasi instantanés
 ```
 
@@ -620,18 +656,53 @@ Anti-spam : dédup par listing, max 20 alertes/h, regroupement si > 3 deals en 2
 
 ## 10. Phasage
 
-| Phase | Contenu | Sortie |
-|---|---|---|
-| **P0** | Monorepo (`apps/web`, `apps/worker`, `services/camoufox`, `packages/db`, `packages/core`), **un seul** `docker-compose.yml`, Drizzle + migrations, doc de setup WSL2 | `docker compose up` sur ton PC, dashboard vide sur `localhost:3000` |
-| **P1** | Framework de crawl : ladder T0→T3, registre de sources, **5 sources pilotes** (eBay API, r/hardwareswap, Kleinanzeigen T2, Tweakers T1, leboncoin T3) | annonces réelles en base, dont leboncoin — le risque technique est levé dès la P1 |
-| **P2** | Parsing specs (regex + LLM fallback) + garde-fous, backfill | `listing_specs` peuplée, précision mesurée sur 200 annonces annotées à la main |
-| **P3** | Prix de référence + détection d'anomalie + `deals` | top deals interrogeable en SQL |
-| **P4** | Front Next.js : dashboard, filtres, `/sources` | utilisable au quotidien |
-| **P5** | Telegram + watches | notifié en < 5 min |
-| **P6** | Montée à ~100 sources (§3) : d'abord l'adapter générique OLX-like (~15 sources d'un coup), puis les forums, puis le reste | couverture large |
-| **P7** | Durcissement : circuit breakers, coalescing, tests de non-régression des sélecteurs, alerte "source muette", réveil programmé Windows optionnel | ça tourne sans surveillance |
+Objectif assumé : **répondre le plus vite possible à « est-ce que ça trouve vraiment des bons
+plans ? »**. Tant que la réponse n'est pas oui, tout le reste (100 sources, durcissement, watches)
+est du travail spéculatif. Le phasage est donc taillé pour un premier verdict rapide.
 
-Chaque phase est mergeable et utile seule. P1→P3 est le cœur de valeur ; P6 est du volume, pas du risque.
+### 🎯 Étape 1 — le MVP verdict (l'essentiel du travail)
+
+Une seule question à trancher : en laissant tourner une journée, est-ce que des annonces réellement
+sous-cotées remontent ?
+
+| Bloc | Contenu |
+|---|---|
+| **Socle** | Monorepo, un `docker-compose.yml`, Postgres + Redis + Drizzle, doc setup WSL2 |
+| **Crawl** | Ladder T0→T2, registre de sources, **6 sources** : eBay API (FR/DE), r/hardwareswap, Kleinanzeigen, leboncoin, Tweakers, Geektroc |
+| **Parsing** | Regex + garde-fous (annonces de recherche, HS, SO-DIMM, ECC) + fallback LM Studio |
+| **Référence** | Médiane/MAD par bucket, avec bootstrap sur LDLC + Geizhals pour ne pas attendre une semaine |
+| **Sortie** | Dashboard minimal : liste triée par `deal_score`, image, prix, €/GB, remise, lien. Pas de filtres, pas de watches |
+| **Alerte** | Telegram basique sur les deals au-dessus du seuil |
+
+Ces 6 sources sont choisies pour couvrir tout l'éventail technique (API, HTML simple, T2 furtif,
+T3 DataDome) : si les quatre marchent, ajouter les 94 autres est mécanique. **leboncoin est dedans
+dès le départ** — c'est le seul vrai risque technique, autant le lever tout de suite plutôt que de
+découvrir en P6 qu'il bloque.
+
+**Verdict attendu** : tu lances une journée, tu regardes. Trois issues possibles —
+*(a)* des vraies affaires remontent → on continue ;
+*(b)* ça remonte du bruit → on ajuste les seuils et les garde-fous, c'est du réglage ;
+*(c)* rien ne remonte parce que le marché est efficient sur ces 6 sources → **c'est une information
+précieuse**, et elle oriente vers les sources de niche (Hardverapró, Sweclockers, forums), là où
+les vendeurs réajustent le moins leurs prix.
+
+### Étape 2 — si le verdict est bon
+
+| Bloc | Contenu |
+|---|---|
+| **Volume** | Montée vers les ~100 sources du §3. L'adapter générique OLX-like en couvre ~15 d'un coup, les forums ~12 |
+| **Front** | Filtres (capacité, kit, fréquence, pays), page `/deal/[id]`, page `/sources` |
+| **Watches** | Alertes paramétrables : « DDR5 2×16 ≥ 6000, remise > 35 %, FR+DE » |
+| **Traduction** | Petit modèle LM Studio pour débloquer les sources CEE et nordiques |
+
+### Étape 3 — confort, si tu accroches
+
+Circuit breakers affinés, tests de non-régression des sélecteurs, alerte « source muette »,
+`recheck:active` pour marquer les vendus, réveil programmé Windows.
+
+> **Ce qui reste non négociable dès l'étape 1**, même pour un projet perso : le rate limiting et le
+> circuit breaker (§2). Pas par excès de rigueur — juste parce qu'un ban de ton IP sur leboncoin
+> t'embêterait personnellement, et que c'est 20 lignes de code.
 
 ---
 
@@ -640,7 +711,8 @@ Chaque phase est mergeable et utile seule. P1→P3 est le cœur de valeur ; P6 e
 | Poste | Coût récurrent |
 |---|---|
 | PC Windows | **déjà possédé** |
-| Postgres, Redis, Firecrawl, Camoufox, Ollama, Next.js | 0 € (open source, en local) |
+| Postgres, Redis, Firecrawl, Camoufox, Next.js | 0 € (open source, en local) |
+| LM Studio + modèles | 0 € (déjà installé) |
 | Telegram Bot API | 0 € |
 | Tailscale (accès mobile, optionnel) | 0 € |
 | Taux de change (frankfurter.app) | 0 € |
@@ -663,12 +735,16 @@ tu paies déjà l'allumage, et le crawl est de l'attente réseau.
 | Worker Node | ~250 Mo |
 | Firecrawl (api + worker) | ~500 Mo |
 | Camoufox × 8 | ~3,2 Go |
-| Ollama (RAM ; le modèle de 9 Go vit en **VRAM**) | ~2 Go |
-| **Total** | **≈ 7 Go** |
+| **Sous-total Docker/WSL2** | **≈ 4,5 Go** |
+| LM Studio (côté Windows ; le modèle vit surtout en **VRAM**) | ~1-2 Go RAM |
 
 Il te reste **~25 Go** pour ton usage normal. Avec `.wslconfig` plafonné à 12 Go, WSL2 ne peut
 structurellement pas déborder. Le stockage est négligeable : ~2 Go de base après un an
 (on ne stocke pas les images, seulement leurs URLs).
+
+**VRAM (12 Go)** : le Gemma 12B QAT occupe ~8 Go et laisse de la marge. C'est la seule ressource
+réellement disputée — si tu joues pendant un crawl, décharge le modèle depuis LM Studio, le worker
+bascule tout seul en mode regex.
 
 ---
 
@@ -680,30 +756,27 @@ structurellement pas déborder. Le stockage est négligeable : ~2 Go de base apr
 | Faux positifs (annonce de recherche, HS, arnaque) | Garde-fous §4 + seuil de confiance + badge scam |
 | Référence prix instable au démarrage (peu de données) | Pas d'alerte tant que n < 30 par bucket ; bootstrap possible avec les prix neufs (Amazon/Newegg) comme borne haute |
 | **Ban de l'IP résidentielle** — impacterait ta navigation perso, tu n'en as qu'une | **Le risque n°1 du plan.** Circuit breaker au 1er signal, 1 req/15-30 s, jamais de parallélisme par domaine, horaires 7h-minuit. Recours : redémarrage box, WARP |
-| **PC éteint = tout est arrêté** (pas de VPS de secours) | Assumé. Coalescing + démarrage échelonné (§7), digest Telegram au réveil. Option réveil programmé (P7) |
+| **PC éteint = tout est arrêté** | Assumé, c'est le mode d'usage prévu (lancer une journée de temps en temps). Coalescing + démarrage échelonné (§7), digest Telegram au réveil |
 | Rafale de requêtes au redémarrage | Coalescing des jobs en retard (§7) — un seul run par source, pas 12. Sans ça, c'est le ban assuré |
-| Docker Desktop / WSL2 qui plante ou se met à jour | `restart: unless-stopped`, healthchecks, et le worker est idempotent (rien ne se perd, les jobs sont dans Redis persisté sur volume) |
-| Windows qui redémarre pour une mise à jour | Docker Desktop au démarrage + heures actives configurées pour éviter les reboots surprise |
-| Le deal est parti avant que tu voies l'alerte | Fréquence ↑ sur les 10 sources les plus rentables, Telegram en priorité, `recheck:active` pour marquer les vendus |
+| LM Studio pas lancé | Détecté au démarrage → mode regex seul, les annonces non parsées attendent en `needs_review`. Aucune erreur |
+| Docker Desktop / WSL2 qui plante | `restart: unless-stopped` ; le worker est idempotent et les jobs sont dans Redis persisté sur volume — rien ne se perd |
+| Le deal est parti avant que tu voies l'alerte | Inhérent au mode intermittent. Telegram en priorité, et `recheck:active` (étape 3) pour marquer les vendus dans le dashboard |
 
 ---
 
 ## 13. Décisions à valider
 
-1. **Périmètre géographique** — combien des 100 sources du §3 on active. Trois options :
-   **(a)** FR seul (~15 sources, main propre possible), **(b)** FR + DE + Benelux + UK (~35 sources,
-   le meilleur ratio à mon avis), **(c)** Europe entière (~80 sources, prix les plus bas mais port
-   et risque). *Ma reco : (b) pour démarrer, (c) en P6.*
-2. **DDR5 seule ou DDR4 aussi ?** DDR4 a aussi flambé et le marché de l'occasion y est plus large.
-   *Ma reco : les deux, avec un filtre par défaut sur DDR5.*
-3. **Le PC tourne-t-il 24/7 ou seulement quand tu l'utilises ?** Ça ne change pas le code, seulement
-   la réactivité. *Ma reco : usage normal + digest Telegram au démarrage ; on ajoutera le réveil
-   programmé en P7 si tu trouves ça frustrant.*
-4. **Dashboard : `localhost` seul, ou aussi accessible depuis ton téléphone via Tailscale ?**
-   *Ma reco : ajouter Tailscale, c'est 10 min et gratuit.*
+Aucune n'est bloquante. Je démarre avec les valeurs par défaut ci-dessous et tu ajustes ensuite —
+le registre de sources rend l'activation/désactivation d'un site triviale, et les seuils sont
+en config.
 
-Aucune de ces questions n'est bloquante — je peux démarrer la P0 avec les valeurs recommandées
-et tu ajustes ensuite (le registre de sources rend l'activation/désactivation triviale).
+| Question | Défaut retenu | Pourquoi |
+|---|---|---|
+| Périmètre géo | **FR + DE + Benelux + UK** | meilleur ratio volume/faisabilité ; l'Europe entière viendra à l'étape 2 |
+| DDR5 seule ou + DDR4 ? | **les deux**, filtre DDR5 par défaut dans l'UI | ça ne coûte rien de collecter, DDR4 a flambé aussi |
+| Modèle LLM | **Gemma 12B QAT** pour les deux rôles | on ajoutera un petit modèle de traduction seulement si tu le trouves lent |
+| Seuil d'alerte | remise > 30 % **et** z < -2.5 | volontairement conservateur au début : mieux vaut rater un deal que crouler sous le bruit. On desserrera après la 1ʳᵉ journée de test |
+| Accès mobile | Tailscale, en option à la fin | 10 min, gratuit, mais pas nécessaire pour le verdict |
 
 ---
 
@@ -715,7 +788,7 @@ et tu ajustes ensuite (le registre de sources rend l'activation/désactivation t
 | Orchestration | Firecrawl cloud | Firecrawl self-hosted | **aucun** |
 | IP résidentielle | proxies à ~8 €/Go | **ta box** | **aucun sur la qualité** ; en échange, une seule IP à ménager |
 | Résolution DataDome | `proxy: stealth` inclus | Camoufox + IP résidentielle | **aucun** — même recette |
-| Parsing LLM | Haiku 4.5 | Qwen2.5-14B sur RTX 4070 | quasi équivalent sur une extraction aussi cadrée |
+| Parsing LLM | API payante | Gemma 12B QAT via LM Studio | quasi équivalent sur une extraction aussi cadrée |
 | **Disponibilité** | 100 % | **PC allumé uniquement** | ⚠️ **le seul vrai renoncement** |
 | Accès distant | URL publique | Tailscale (et Telegram pour les alertes) | négligeable |
 | Ops | zéro | 1 × `docker compose` | quelques heures de setup |
